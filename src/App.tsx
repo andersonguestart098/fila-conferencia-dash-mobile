@@ -275,16 +275,6 @@ function DetalhePedidoPanel({ pedido }: DetalheProps) {
   const colors =
     statusColors[pedido.statusConferencia] || statusColors.AL;
 
-  const isFinalizadaOk = pedido.statusConferencia === "F";
-
-  const handleIniciarConferencia = () => {
-    if (isFinalizadaOk) return;
-    // aqui você pode futuramente chamar a API iniciarConferencia
-    window.alert(
-      `Iniciar conferência para o pedido #${pedido.nunota} (stub).`
-    );
-  };
-
   return (
     <div className="detail-card">
       <div className="detail-header">
@@ -355,20 +345,16 @@ function DetalhePedidoPanel({ pedido }: DetalheProps) {
         )}
       </div>
 
+      {/* 🔒 Botão sempre desabilitado no dashboard */}
       <button
-        className={
-          "detail-button" +
-          (isFinalizadaOk ? " detail-button-disabled" : "")
-        }
-        onClick={handleIniciarConferencia}
-        disabled={isFinalizadaOk}
+        className="detail-button detail-button-disabled"
+        disabled
       >
-        {isFinalizadaOk
-          ? "Conferência finalizada"
-          : "Iniciar conferência"}
+        Conferência feita no app
       </button>
     </div>
   );
 }
+
 
 export default App;
