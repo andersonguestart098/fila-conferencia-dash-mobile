@@ -44,47 +44,43 @@ const statusColors: Record<
    ÁUDIO POR VENDEDOR (nome COMPLETO normalizado)
 ----------------------------------------------------- */
 const audioVendedores: Record<string, string> = {
-  // usa o nome exatamente como vem do backend, maiúsculo / sem acento funciona
   "GUILHERME RODRIGUES": "/audio/guilherme.mp3",
   "LUIS TIZONI": "/audio/luis.mp3",
-  "ALINE GOMES": "/audio/corte-generico.mp3",
+  "ALINE GOMES": "/audio/felipe.mp3",
 
   "MARCIA MELLER": "/audio/marcia.mp3",
   "JONATHAS RODRIGUES": "/audio/jonathas.mp3",
   "PAULO FAGUNDES": "/audio/fagundes.mp3",
   "RAFAEL AZEVEDO": "/audio/rafael.mp3",
-  "GB": "/audio/corte-generico.mp3",
+  GB: "/audio/felipe.mp3",
 
   "GILIARD CAMPOS": "/audio/giliard.mp3",
-  "SABINO BRESOLIN": "/audio/6+Sabino.mp3", // se renomear, ajusta aqui
+  "SABINO BRESOLIN": "/audio/6+Sabino.mp3",
   "GUILHERME FRANCA": "/audio/guilherme.mp3",
   "LEONARDO MACHADO": "/audio/leonardo.mp3",
   "EDUARDO SANTOS": "/audio/eduardo.mp3",
   "RICARDO MULLER": "/audio/ricardo.mp3",
 
-  "BRUNA SIQUEIRA": "/audio/corte-generico.mp3",
-  "REBECA MOURA": "/audio/corte-generico.mp3",
+  "BRUNA SIQUEIRA": "/audio/felipe.mp3",
+  "REBECA MOURA": "/audio/felipe.mp3",
 
   "GABRIEL AIRES": "/audio/gabriel.mp3",
-  "GELSON MACHADO": "/audio/corte-generico.mp3",
+  "GELSON MACHADO": "/audio/felipe.mp3",
 
   "GASPAR TARTARI": "/audio/gaspar.mp3",
 
-  // 👇 este é o cara que tá dando log agora
   "FERNANDO SERAFIM": "/audio/fernando.mp3",
 
-  "TREVISANI": "/audio/corte-generico.mp3",
+  TREVISANI: "/audio/felipe.mp3",
 
   "DAIANE CAMPOS": "/audio/daiane.mp3",
-  "JULIA TARTARI": "/audio/corte-generico.mp3",
+  "JULIA TARTARI": "/audio/felipe.mp3",
 
   "FELIPE TARTARI": "/audio/felipe.mp3",
   "BETO TARTARI": "/audio/beto.mp3",
 
-  "DANIEL MACCARI": "/audio/corte-generico.mp3",
+  "DANIEL MACCARI": "/audio/felipe.mp3",
 };
-
-
 
 function normalizarNome(nome?: string | null): string {
   if (!nome) return "";
@@ -101,8 +97,9 @@ function tocarAlertaCorte(
 ) {
   const nomeNorm = normalizarNome(nomeVendedor);
 
+  // fallback usando um MP3 que EXISTE (felipe.mp3).
   const src =
-    (nomeNorm && audioVendedores[nomeNorm]) || "/audio/corte-generico.mp3";
+    (nomeNorm && audioVendedores[nomeNorm]) || "/audio/felipe.mp3";
 
   console.log("[AUDIO_CORTE] Pedido", nunota, {
     nomeVendedor,
@@ -144,6 +141,7 @@ function App() {
   const [loadingInicial, setLoadingInicial] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [selecionado, setSelecionado] = useState<DetalhePedido | null>(null);
+  const [somHabilitado, setSomHabilitado] = useState<boolean>(false);
 
   // guarda se o pedido tinha corte na última leitura
   const ultimoCorteRef = useRef<Record<number, boolean>>({});
@@ -171,6 +169,31 @@ function App() {
         delete ultimoCorte[Number(k)];
       }
     });
+  };
+
+  /* ---------------- HABILITAR / TESTAR ÁUDIO ---------------- */
+
+  const handleHabilitarAudio = () => {
+    try {
+      // usa um arquivo que com certeza existe
+      const audio = new Audio("/audio/felipe.mp3");
+      audio
+        .play()
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          setSomHabilitado(true);
+          console.log("[AUDIO] Habilitado com sucesso");
+        })
+        .catch((err) => {
+          console.error("Erro ao habilitar áudio:", err);
+          alert(
+            "Não foi possível reproduzir o som de teste. Verifique se o navegador permitiu áudio para este site."
+          );
+        });
+    } catch (e) {
+      console.error("Erro ao criar áudio de teste:", e);
+    }
   };
 
   /* --------------------- LOAD + POLLING -------------------- */
@@ -271,7 +294,15 @@ function App() {
                   <span className="box-icon">📦</span>
                   <div>
                     <div className="pedido-label">Pedido</div>
-                    <div className="pedido-number">#{p.nunota}</div>
+                    <div className="pedido-number">
+                      #{p.nunota}
+                      {p.numNota != null && p.numNota !== 0 && (
+                        <span className="pedido-number-sec">
+                          {" "}
+                          · Nro. Nota {p.numNota}
+                        </span>
+                      )}
+                    </div>
 
                     {p.nomeParc && (
                       <div className="pedido-vendedor">
@@ -363,6 +394,10 @@ function App() {
               ⚠ {erro} (mantendo últimos dados)
             </span>
           )}
+
+          <button className="topbar-sound-btn" onClick={handleHabilitarAudio}>
+            {somHabilitado ? "🔊 Som habilitado" : "🔇 Testar som"}
+          </button>
         </div>
       </header>
 
@@ -410,7 +445,15 @@ function DetalhePedidoPanel({ pedido }: { pedido: DetalhePedido }) {
       <div className="detail-header">
         <div>
           <div className="detail-label">Pedido</div>
-          <div className="detail-number">#{pedido.nunota}</div>
+          <div className="detail-number">
+            #{pedido.nunota}
+            {pedido.numNota != null && pedido.numNota !== 0 && (
+              <span className="detail-number-sec">
+                {" "}
+                · NF {pedido.numNota}
+              </span>
+            )}
+          </div>
 
           {pedido.nomeParc && (
             <div className="detail-vendedor">
