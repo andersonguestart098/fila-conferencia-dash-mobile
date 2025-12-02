@@ -65,40 +65,43 @@ export function DetalhePedidoPanel({ pedido }: DetalhePedidoPanelProps) {
       <div className="detail-section">
         <div className="detail-section-title">Itens</div>
 
-        {pedido.itens.map((item, idx) => {
-          const original =
-            item.qtdOriginal ?? item.qtdEsperada ?? item.qtdAtual ?? 0;
-          const conferido = item.qtdConferida ?? item.qtdAtual ?? original;
-          const atualNaNota = item.qtdAtual ?? conferido;
-          const corte = Math.max(0, original - atualNaNota);
+        {/* 👇 Container com scroll apenas para a lista de itens */}
+        <div className="detail-items-scroll">
+          {pedido.itens.map((item, idx) => {
+            const original =
+              item.qtdOriginal ?? item.qtdEsperada ?? item.qtdAtual ?? 0;
+            const conferido = item.qtdConferida ?? item.qtdAtual ?? original;
+            const atualNaNota = item.qtdAtual ?? conferido;
+            const corte = Math.max(0, original - atualNaNota);
 
-          return (
-            <div
-              key={`${item.codProd}-${idx}`}
-              className={
-                "detail-item-row" + (corte > 0 ? " item-com-corte" : "")
-              }
-            >
-              <div className="detail-item-main">
-                <div className="detail-item-title">
-                  {item.codProd} · {item.descricao}
+            return (
+              <div
+                key={`${item.codProd}-${idx}`}
+                className={
+                  "detail-item-row" + (corte > 0 ? " item-com-corte" : "")
+                }
+              >
+                <div className="detail-item-main">
+                  <div className="detail-item-title">
+                    {item.codProd} · {item.descricao}
+                  </div>
+                  <div className="detail-item-sub">
+                    Unidade: {item.unidade}
+                  </div>
                 </div>
-                <div className="detail-item-sub">
-                  Unidade: {item.unidade}
+
+                <div className="detail-item-qty">
+                  <div>Orig: {original}</div>
+                  <div>Nota: {atualNaNota}</div>
+                  <div>Conf: {conferido}</div>
+                  {corte > 0 && (
+                    <div className="item-corte">✂️ Corte: {corte}</div>
+                  )}
                 </div>
               </div>
-
-              <div className="detail-item-qty">
-                <div>Orig: {original}</div>
-                <div>Nota: {atualNaNota}</div>
-                <div>Conf: {conferido}</div>
-                {corte > 0 && (
-                  <div className="item-corte">✂️ Corte: {corte}</div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <button className="detail-button detail-button-disabled" disabled>

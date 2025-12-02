@@ -296,7 +296,8 @@ body {
   margin-bottom: 16px;
 }
 
-.numero-primario, .numero-secundario {
+.numero-primario,
+.numero-secundario {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -360,7 +361,7 @@ body {
   font-size: 18px;
 }
 
-/* Estilos para vendedor e cliente */
+/* Estilos para vendedor e cliente na lista */
 .info-row-names {
   display: flex;
   flex-direction: column;
@@ -532,7 +533,32 @@ body {
   margin-bottom: 8px;
 }
 
-/* Identity tags no detalhe */
+/* NOVO: número e NF no detalhe */
+.detail-number {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.detail-number-sec {
+  font-size: 15px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+/* NOVO: linhas de cliente/vendedor no detalhe */
+.detail-vendedor {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f9fafb;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+/* Identity tags no detalhe (já existia, caso queira usar depois) */
 .detail-identity {
   display: flex;
   flex-direction: column;
@@ -683,14 +709,25 @@ body {
   align-items: flex-start;
   padding: 14px 0;
   border-bottom: 1px solid #f1f5f9;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* hover padrão */
 .detail-item-row:hover {
   background-color: rgba(241, 245, 249, 0.5);
   border-radius: 10px;
   padding: 14px 12px;
   margin: 0 -12px;
+}
+
+/* NOVO: destacar itens com corte */
+.detail-item-row.item-com-corte {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border-left: 4px solid #dc2626;
+}
+
+.detail-item-row.item-com-corte:hover {
+  background: #fee2e2;
 }
 
 .detail-item-row:last-child {
@@ -736,6 +773,7 @@ body {
   margin-left: 16px;
 }
 
+/* Estrutura antiga de qty se você usar depois */
 .qty-row {
   display: flex;
   justify-content: space-between;
@@ -753,6 +791,18 @@ body {
   font-weight: 700;
   text-align: right;
   min-width: 40px;
+}
+
+/* NOVO: badge de corte no detalhe */
+.item-corte {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  align-self: flex-start;
 }
 
 .item-corte .qty-label {
