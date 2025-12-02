@@ -1,4 +1,5 @@
 // src/App.tsx
+import { useState } from "react";
 import "./App.css";
 import { useFilaConferencia } from "./hooks/useFilaConferencia";
 import { PedidoList } from "./components/PedidoList";
@@ -12,6 +13,9 @@ import {
 function App() {
   const { pedidos, loadingInicial, erro, selecionado, setSelecionado } =
     useFilaConferencia();
+
+  // 👇 novo estado para exibir/ocultar o painel de detalhes
+  const [mostrarDetalhe, setMostrarDetalhe] = useState(true);
 
   return (
     <div className="app-root">
@@ -34,6 +38,19 @@ function App() {
               ⚠ {erro} (mantendo últimos dados)
             </span>
           )}
+
+          {/* 🔁 Botão para mostrar/ocultar o detalhe */}
+          <button
+            className="topbar-log-btn"
+            onClick={() => setMostrarDetalhe((v) => !v)}
+            title={
+              mostrarDetalhe
+                ? "Ocultar detalhes do pedido"
+                : "Mostrar detalhes do pedido"
+            }
+          >
+            {mostrarDetalhe ? "👁️ Ocultar Detalhe" : "🧾 Mostrar Detalhe"}
+          </button>
 
           <button
             className="topbar-log-btn"
@@ -64,16 +81,19 @@ function App() {
           />
         </section>
 
-        <aside className="detail-pane">
-          {selecionado ? (
-            <DetalhePedidoPanel pedido={selecionado} />
-          ) : (
-            <div className="detail-empty">
-              <span>👈</span>
-              <span>Selecione um pedido na lista</span>
-            </div>
-          )}
-        </aside>
+        {/* Só renderiza o painel direito se estiver habilitado */}
+        {mostrarDetalhe && (
+          <aside className="detail-pane">
+            {selecionado ? (
+              <DetalhePedidoPanel pedido={selecionado} />
+            ) : (
+              <div className="detail-empty">
+                <span>👈</span>
+                <span>Selecione um pedido na lista</span>
+              </div>
+            )}
+          </aside>
+        )}
       </main>
     </div>
   );
