@@ -13,6 +13,15 @@ interface PedidoListProps {
 
 const ITENS_POR_PAGINA = 10;
 
+// 🔎 mesma regra de corte usada no DetalhePedidoPanel
+function temCorteNoPedido(pedido: DetalhePedido): boolean {
+  return pedido.itens.some((i) => {
+    const original = i.qtdOriginal ?? i.qtdEsperada ?? i.qtdAtual ?? 0;
+    const atualNaNota = i.qtdAtual ?? original;
+    return atualNaNota < original;
+  });
+}
+
 export function PedidoList({
   pedidos,
   loadingInicial,
@@ -131,7 +140,13 @@ export function PedidoList({
 
               const colors =
                 statusColors[p.statusConferencia] || statusColors.AL;
-              const statusDesc = statusMap[p.statusConferencia] || "-";
+              const statusBase = statusMap[p.statusConferencia] || "-";
+
+              // ✂️ verifica se o pedido tem corte
+              const temCorte = temCorteNoPedido(p);
+              const statusDesc = temCorte
+                ? `✂️ Corte no pedido · ${statusBase}`
+                : statusBase;
 
               return (
                 <div
