@@ -29,6 +29,38 @@ export function PedidoList({
     setPagina(1);
   }, [busca, pedidos]);
 
+  // 🔍 filtra pelos campos principais (nunota, numNota, cliente, vendedor)
+  const filtrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return pedidos;
+
+    return pedidos.filter((p) => {
+      const nunotaStr = p.nunota?.toString() ?? "";
+      const numNotaStr = p.numNota ? p.numNota.toString() : "";
+      const cliente = p.nomeParc?.toLowerCase() ?? "";
+      const vendedor = p.nomeVendedor?.toLowerCase() ?? "";
+
+      return (
+        nunotaStr.includes(termo) ||
+        numNotaStr.includes(termo) ||
+        cliente.includes(termo) ||
+        vendedor.includes(termo)
+      );
+    });
+  }, [busca, pedidos]);
+
+  const totalFiltrados = filtrados.length;
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(totalFiltrados / ITENS_POR_PAGINA)
+  );
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const inicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
+  const fim = inicio + ITENS_POR_PAGINA;
+  const paginaPedidos = filtrados.slice(inicio, fim);
+
+  // 🔽 A partir daqui só JSX/returns, sem mais hooks
+
   if (loadingInicial && pedidos.length === 0) {
     return (
       <div className="center">
@@ -56,37 +88,6 @@ export function PedidoList({
     );
   }
 
-  // 🔍 filtra pelos campos principais (nunota, numNota, cliente, vendedor)
-  const filtrados = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    if (!termo) return pedidos;
-
-    return pedidos.filter((p) => {
-      const nunotaStr = p.nunota?.toString() ?? "";
-      const numNotaStr = p.numNota ? p.numNota.toString() : "";
-      const cliente = p.nomeParc?.toLowerCase() ?? "";
-      const vendedor = p.nomeVendedor?.toLowerCase() ?? "";
-
-      return (
-        nunotaStr.includes(termo) ||
-        numNotaStr.includes(termo) ||
-        cliente.includes(termo) ||
-        vendedor.includes(termo)
-      );
-    });
-  }, [busca, pedidos]);
-
-  const totalFiltrados = filtrados.length;
-  const totalPaginas = Math.max(
-    1,
-    Math.ceil(totalFiltrados / ITENS_POR_PAGINA)
-  );
-
-  const paginaAtual = Math.min(pagina, totalPaginas);
-  const inicio = (paginaAtual - 1) * ITENS_POR_PAGINA;
-  const fim = inicio + ITENS_POR_PAGINA;
-  const paginaPedidos = filtrados.slice(inicio, fim);
-
   return (
     <div>
       {/* Barra de ferramentas da lista */}
@@ -103,10 +104,7 @@ export function PedidoList({
           <span>
             Mostrando{" "}
             <strong>
-              {totalFiltrados === 0
-                ? 0
-                : inicio + 1}{" "}
-              -{" "}
+              {totalFiltrados === 0 ? 0 : inicio + 1} -{" "}
               {Math.min(fim, totalFiltrados)}
             </strong>{" "}
             de <strong>{totalFiltrados}</strong> pedidos
@@ -133,8 +131,7 @@ export function PedidoList({
 
               const colors =
                 statusColors[p.statusConferencia] || statusColors.AL;
-              const statusDesc =
-                statusMap[p.statusConferencia] || "-";
+              const statusDesc = statusMap[p.statusConferencia] || "-";
 
               return (
                 <div
@@ -158,12 +155,8 @@ export function PedidoList({
                           </div>
                           {p.numNota != null && p.numNota !== 0 && (
                             <div className="numero-secundario">
-                              <span className="num-label">
-                                Nro. Nota:
-                              </span>
-                              <span className="num-value">
-                                {p.numNota}
-                              </span>
+                              <span className="num-label">Nro. Nota:</span>
+                              <span className="num-value">{p.numNota}</span>
                             </div>
                           )}
                         </div>
