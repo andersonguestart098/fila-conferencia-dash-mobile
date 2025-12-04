@@ -11,7 +11,7 @@ interface PedidoListProps {
   onSelect: (pedido: DetalhePedido) => void;
 }
 
-const ITENS_POR_PAGINA = 10;
+const ITENS_POR_PAGINA = 50;
 
 // 🔎 mesma regra de corte usada no DetalhePedidoPanel
 function temCorteNoPedido(pedido: DetalhePedido): boolean {
