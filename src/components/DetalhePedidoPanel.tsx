@@ -7,13 +7,6 @@ interface DetalhePedidoPanelProps {
 }
 
 export function DetalhePedidoPanel({ pedido }: DetalhePedidoPanelProps) {
-  const itensComCorte = pedido.itens.filter((i) => {
-    const original = i.qtdOriginal ?? i.qtdEsperada ?? i.qtdAtual ?? 0;
-    const atualNaNota = i.qtdAtual ?? original;
-    return atualNaNota < original;
-  });
-
-  const temCorte = itensComCorte.length > 0;
   const divergente = pedido.statusConferencia === "D";
 
   // 🔎 Status: se estiver divergente, força texto "Finalizada divergente"
@@ -59,7 +52,6 @@ export function DetalhePedidoPanel({ pedido }: DetalhePedidoPanelProps) {
         >
           <span className="detail-status-dot" />
           <span className="detail-status-text">
-            {/* sem ícone de tesoura aqui, só o texto do status */}
             {statusDesc}
           </span>
         </div>
@@ -98,7 +90,6 @@ export function DetalhePedidoPanel({ pedido }: DetalhePedidoPanelProps) {
                   <div>Nota: {atualNaNota}</div>
                   <div>Conf: {conferido}</div>
                   {corte > 0 && (
-                    // mantém o detalhe do corte, mas sem o ícone ✂️
                     <div className="item-corte">Corte: {corte}</div>
                   )}
                 </div>
