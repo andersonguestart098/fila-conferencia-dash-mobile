@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DetalhePedido } from "../types/conferencia";
 import { statusColors, statusMap } from "../config/status";
+// 🔊 importa o audio manager
+import { dispararAlertasVoz } from "../../public/audio/audioManager";
 
 interface PedidoListProps {
   pedidos: DetalhePedido[];
@@ -116,6 +118,14 @@ export function PedidoList({
       setPagina(totalPaginas);
     }
   }, [totalPaginas, pagina]);
+
+  // 🔊 DISPARO DO ÁUDIO VIA audioManager
+  // Aqui a gente passa a lista completa de pedidos,
+  // e o audioManager decide se tem status "C" novo pra tocar.
+  useEffect(() => {
+    if (!pedidos || pedidos.length === 0) return;
+    dispararAlertasVoz(pedidos);
+  }, [pedidos]);
 
   if (loadingInicial && pedidos.length === 0) {
     return (

@@ -86,9 +86,8 @@ export function DetalhePedidoPanel({ pedido }: DetalhePedidoPanelProps) {
                 </div>
 
                 <div className="detail-item-qty">
-                  <div>Orig: {original}</div>
-                  <div>Nota: {atualNaNota}</div>
-                  <div>Conf: {conferido}</div>
+                  <div>Quantidade esperada: {original}</div>
+                  <div>Quantidade conferida: {conferido}</div>
                   {corte > 0 && (
                     <div className="item-corte">Corte: {corte}</div>
                   )}

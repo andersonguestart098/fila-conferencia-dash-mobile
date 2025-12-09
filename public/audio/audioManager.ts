@@ -222,27 +222,6 @@ function processarFilaAudio() {
 }
 
 /* -----------------------------------------------------
-   Regras de corte
------------------------------------------------------ */
-function temCorteNoPedido(pedido: DetalhePedido): boolean {
-  const temCorte = pedido.itens.some((i) => {
-    const original = i.qtdOriginal ?? i.qtdEsperada ?? i.qtdAtual ?? 0;
-    const atualNaNota = i.qtdAtual ?? original;
-    return atualNaNota < original;
-  });
-
-  if (temCorte) {
-    AudioLogger.log(
-      "CORTE_DETECT",
-      `Corte detectado no pedido #${pedido.nunota}`,
-      { nunota: pedido.nunota }
-    );
-  }
-
-  return temCorte;
-}
-
-/* -----------------------------------------------------
    DISPARO DO ÁUDIO (1x por nunota por aba)
 ----------------------------------------------------- */
 export function tocarAlertaCorte(
@@ -313,6 +292,7 @@ export function tocarAlertaCorte(
 
 /* -----------------------------------------------------
    API para o hook: disparar alertas em uma lista
+   👉 Agora: SOMENTE statusConferencia === "C"
 ----------------------------------------------------- */
 export function dispararAlertasVoz(lista: DetalhePedido[]) {
   AudioLogger.log("SCAN_START", `Iniciando scan de ${lista.length} pedidos`, {
@@ -322,21 +302,25 @@ export function dispararAlertasVoz(lista: DetalhePedido[]) {
   let enfileirouAlgum = false;
 
   for (const p of lista) {
-    const temCorteAgora = temCorteNoPedido(p);
+    const estaAguardandoLiberacaoParaCorte = p.statusConferencia === "C";
     const jaTocou = playedNunotas.has(p.nunota);
     const jaNaFila = queueNunotas.has(p.nunota);
 
     AudioLogger.log("SCAN_ITEM", `Analisando pedido #${p.nunota}`, {
       nunota: p.nunota,
-      temCorteAgora,
+      status: p.statusConferencia,
+      estaAguardandoLiberacaoParaCorte,
       jaTocou,
       jaNaFila,
     });
 
-    if (temCorteAgora && !jaTocou && !jaNaFila) {
+    // 🔥 NOVA REGRA:
+    // Só dispara se estiver com status "C",
+    // e ainda não tiver tocado nem estiver na fila
+    if (estaAguardandoLiberacaoParaCorte && !jaTocou && !jaNaFila) {
       AudioLogger.log(
-        "ALERT_TRIGGER_CORTE",
-        `Pedido #${p.nunota} tem corte e ainda não está na fila nem tocou. Enfileirando.`,
+        "ALERT_TRIGGER_STATUS_C",
+        `Pedido #${p.nunota} está AGUARDANDO LIBERAÇÃO PARA CORTE (status C). Enfileirando alerta.`,
         {
           nunota: p.nunota,
           status: p.statusConferencia,
@@ -351,14 +335,14 @@ export function dispararAlertasVoz(lista: DetalhePedido[]) {
         "SCAN_BREAK",
         `Já enfileirou o pedido #${p.nunota}, interrompendo scan para evitar múltiplos disparos na mesma varredura.`
       );
-      break; // 👈 AQUI é o "break" que você comentou
+      break; // mantém o break pra não enfileirar vários de uma vez
     }
   }
 
   if (!enfileirouAlgum) {
     AudioLogger.log(
       "SCAN_NO_ALERT",
-      "Scan concluído: nenhum novo pedido com corte para enfileirar."
+      "Scan concluído: nenhum pedido com status C (aguardando liberação para corte) novo para enfileirar."
     );
   }
 }
