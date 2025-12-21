@@ -1,26 +1,104 @@
 // src/components/DetalhePedidoPanel.tsx
+import { useEffect } from "react";
 import type { DetalhePedido } from "../types/conferencia";
 import { statusColors, statusMap } from "../config/status";
+import Lottie from "lottie-react";
+
+import atencaoAnim from "../assets/lotties/atencao.json";
+
+function normalizeStatus(status: any): string {
+  return String(status ?? "").trim().toUpperCase();
+}
+
+function formatElapsed(ms: number) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+  const ss = String(totalSec % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
 
 interface DetalhePedidoPanelProps {
   pedido: DetalhePedido;
+
+  /** true quando o pedido está em AC e passou de 5 min e ainda não foi confirmado */
+  attentionActive?: boolean;
+
+  /** tempo corrido (ms) que você já calcula no PedidoList */
+  attentionElapsedMs?: number;
+
+  /** clique no OK para “dispensar” o alerta */
+  onAttentionOk?: () => void;
 }
 
-export function DetalhePedidoPanel({ pedido }: DetalhePedidoPanelProps) {
+export function DetalhePedidoPanel({
+  pedido,
+  attentionActive = false,
+  attentionElapsedMs = 0,
+  onAttentionOk,
+}: DetalhePedidoPanelProps) {
   const divergente = pedido.statusConferencia === "D";
 
-  // 🔎 Status: se estiver divergente, força texto "Finalizada divergente"
   const statusDesc = divergente
     ? "Finalizada divergente"
     : statusMap[pedido.statusConferencia] || pedido.statusConferencia;
 
-  // 🎨 Cores: se divergente, usa paleta de alerta; senão, cores padrão do status
   const colors = divergente
     ? { bg: "#FFE0E0", border: "#FF9999", text: "#B00000" }
     : statusColors[pedido.statusConferencia] || statusColors.AL;
 
+  const statusCode = normalizeStatus((pedido as any).statusConferencia);
+
+  // ✅ Logs pra debug (se não aparecer, você vai ver no console o motivo)
+  useEffect(() => {
+    console.log("🧠 [DETAIL PANEL] props", {
+      nunota: pedido.nunota,
+      statusRaw: (pedido as any).statusConferencia,
+      statusCode,
+      attentionActive,
+      attentionElapsedMs,
+      attentionElapsedMin: Math.floor(attentionElapsedMs / 60000),
+    });
+  }, [pedido.nunota, statusCode, attentionActive, attentionElapsedMs, pedido]);
+
   return (
-    <div className="detail-card">
+    <div className="detail-card" style={{ position: "relative" }}>
+      {/* ✅ Overlay FULL SCREEN sempre que attentionActive=true */}
+      {attentionActive && (
+        <div
+          className="attention-overlay"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999999,
+          }}
+        >
+          <div className="attention-overlay-content">
+            <div className="attention-overlay-lottie">
+              <Lottie animationData={atencaoAnim} loop autoplay />
+            </div>
+
+            <div className="attention-overlay-title">Atenção</div>
+            <div className="attention-overlay-sub">
+              Pedido #{pedido.nunota} aguardando conferência há mais de 5 minutos.
+            </div>
+
+            <div className="attention-overlay-sub" style={{ fontWeight: 900 }}>
+              Tempo: {formatElapsed(attentionElapsedMs)}
+            </div>
+
+            <button
+              className="attention-overlay-ok"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAttentionOk?.();
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="detail-header">
         <div>
           <div className="detail-label">Pedido</div>
@@ -51,16 +129,13 @@ export function DetalhePedidoPanel({ pedido }: DetalhePedidoPanelProps) {
           }}
         >
           <span className="detail-status-dot" />
-          <span className="detail-status-text">
-            {statusDesc}
-          </span>
+          <span className="detail-status-text">{statusDesc}</span>
         </div>
       </div>
 
       <div className="detail-section">
         <div className="detail-section-title">Itens</div>
 
-        {/* 👇 Container com scroll apenas para a lista de itens */}
         <div className="detail-items-scroll">
           {pedido.itens.map((item, idx) => {
             const original =
@@ -88,9 +163,7 @@ export function DetalhePedidoPanel({ pedido }: DetalhePedidoPanelProps) {
                 <div className="detail-item-qty">
                   <div>Quantidade esperada: {original}</div>
                   <div>Quantidade conferida: {conferido}</div>
-                  {corte > 0 && (
-                    <div className="item-corte">Corte: {corte}</div>
-                  )}
+                  {corte > 0 && <div className="item-corte">Corte: {corte}</div>}
                 </div>
               </div>
             );
