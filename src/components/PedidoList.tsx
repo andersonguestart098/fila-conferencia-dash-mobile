@@ -87,6 +87,18 @@ function escapeHtml(s: any) {
     .replaceAll("'", "&#039;");
 }
 
+// ✅ Função para tocar som de alerta
+function tocarSomAlerta() {
+  try {
+    const audio = new Audio("/audio/efeitoSonoro.wav");
+    audio.volume = 0.7; // Volume moderado
+    audio.play().catch(e => console.log("Erro ao tocar som:", e));
+    console.log("🔊 Som de alerta disparado");
+  } catch (error) {
+    console.error("Erro ao criar áudio:", error);
+  }
+}
+
 // ✅ impressão simples: abre uma janela HTML e chama print
 function imprimirExpedicao(p: DetalhePedido, conferente?: Conferente | null) {
   const itens = (p.itens ?? []).map((it: any, idx: number) => {
@@ -105,25 +117,123 @@ function imprimirExpedicao(p: DetalhePedido, conferente?: Conferente | null) {
       <meta charset="utf-8"/>
       <title>Expedição - Pedido ${escapeHtml(p.nunota)}</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 18px; color: #111; }
-        .top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
-        .h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px 0; }
-        .sub { font-size: 12px; margin: 0; color:#333; }
-        .box { border:1px solid #ddd; border-radius:12px; padding:12px; }
-        table { width:100%; border-collapse:collapse; margin-top:12px; }
-        th, td { border:1px solid #ddd; padding:8px; font-size:12px; }
-        th { background:#f5f5f5; text-align:left; }
-        .muted { color:#666; font-size:11px; }
-        .sign { margin-top: 22px; display:flex; gap:18px; }
-        .line { flex:1; border-top:1px solid #111; padding-top:6px; font-size:12px; }
-        .right { text-align:right; }
+        body { 
+          font-family: Arial, sans-serif; 
+          padding: 18px; 
+          color: #111; 
+          max-width: 800px;
+          margin: 0 auto;
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 20px;
+          border-bottom: 2px solid #333;
+          padding-bottom: 10px;
+        }
+        .logo {
+          height: 45px;
+          margin-bottom: 10px;
+        }
+        .title {
+          font-size: 24px;
+          font-weight: 800;
+          margin: 5px 0;
+          color: #333;
+        }
+        .subtitle {
+          font-size: 14px;
+          margin: 5px 0;
+          color: #666;
+        }
+        .top { 
+          display:flex; 
+          justify-content:space-between; 
+          align-items:flex-start; 
+          gap:16px; 
+          margin: 20px 0;
+        }
+        .h1 { 
+          font-size: 20px; 
+          font-weight: 800; 
+          margin: 0 0 4px 0; 
+          color: #333;
+        }
+        .sub { 
+          font-size: 12px; 
+          margin: 4px 0; 
+          color:#555; 
+        }
+        .box { 
+          border:1px solid #ddd; 
+          border-radius:12px; 
+          padding:16px; 
+          margin-top: 10px;
+          background: #fff;
+        }
+        table { 
+          width:100%; 
+          border-collapse:collapse; 
+          margin-top:12px; 
+          font-size: 12px;
+        }
+        th, td { 
+          border:1px solid #ddd; 
+          padding:8px; 
+          text-align: left;
+        }
+        th { 
+          background:#f5f5f5; 
+          font-weight: bold;
+          color: #333;
+        }
+        .muted { 
+          color:#666; 
+          font-size:11px; 
+          margin-top: 10px;
+          font-style: italic;
+        }
+        .sign { 
+          margin-top: 22px; 
+          display:flex; 
+          gap:18px; 
+        }
+        .line { 
+          flex:1; 
+          border-top:1px solid #111; 
+          padding-top:6px; 
+          font-size:12px; 
+          text-align: center;
+        }
+        .right { 
+          text-align:right; 
+        }
+        .total-info {
+          font-weight: bold;
+          margin: 15px 0;
+          padding: 10px;
+          background: #f9f9f9;
+          border-radius: 8px;
+          text-align: center;
+        }
+        .qtd-conferida {
+          border: 1px solid #ccc;
+          width: 70px;
+          text-align: center;
+          background: #fff;
+        }
         @media print {
-          body { padding: 0; }
-          .box { border: none; padding: 0; }
+          body { padding: 10px; }
+          .box { border: 1px solid #000; }
+          .no-print { display: none; }
         }
       </style>
     </head>
     <body>
+      <div class="header">
+        <img src="logo.png" class="logo" alt="Cemear Logo">
+        <div class="title">DOCUMENTO DE CONFERÊNCIA</div>
+      </div>
+
       <div class="box">
         <div class="top">
           <div>
@@ -147,6 +257,7 @@ function imprimirExpedicao(p: DetalhePedido, conferente?: Conferente | null) {
               <th style="width:90px;">Cód.</th>
               <th>Descrição</th>
               <th style="width:110px;">Quantidade</th>
+              <th style="width:130px;">Quantidade Conferida</th>
             </tr>
           </thead>
           <tbody>
@@ -158,6 +269,7 @@ function imprimirExpedicao(p: DetalhePedido, conferente?: Conferente | null) {
                 <td>${escapeHtml(r.cod)}</td>
                 <td>${escapeHtml(r.desc)}</td>
                 <td>${escapeHtml(r.qtd)}</td>
+                <td><div class="qtd-conferida">&nbsp;</div></td>
               </tr>
             `
               )
@@ -165,25 +277,35 @@ function imprimirExpedicao(p: DetalhePedido, conferente?: Conferente | null) {
           </tbody>
         </table>
 
+        <div class="total-info">
+          TOTAL DE ITENS: ${itens.length} | TOTAL DE UNIDADES: ${itens.reduce((sum, item) => sum + item.qtd, 0)}
+        </div>
+
         <p class="muted">Obs: conferir quantidades e integridade dos itens antes da expedição.</p>
 
         <div class="sign">
-          <div class="line"><b>Assinatura do conferente</b></div>
-          <div class="line"><b>Nome (legível)</b>: ${escapeHtml(conferente?.nome ?? "")}</div>
+          <div class="line"><b>Assinatura do conferente</b>: ${escapeHtml(conferente?.nome ?? "")}</div>
+          <div class="line"><b>Carimbo</b></div>
+        </div>
+
+        <div style="margin-top: 20px; font-size: 10px; color: #999; text-align: center;">
+          Cemear Distribuidora Ltda. | Documento emitido eletronicamente
         </div>
       </div>
 
       <script>
         window.onload = () => {
           window.focus();
-          window.print();
+          setTimeout(() => {
+            window.print();
+          }, 500);
         };
       </script>
     </body>
   </html>
-  `;
+`;
 
-  const w = window.open("", "_blank", "width=900,height=800");
+  const w = window.open("", `pedido${p.nunota}`, "width=900,height=800");
   if (!w) {
     alert("Pop-up bloqueado. Libere o pop-up para imprimir.");
     return;
@@ -268,6 +390,7 @@ export function PedidoList({
   const [somenteAguardando, setSomenteAguardando] = useState(false);
   const [vendedorFiltro, setVendedorFiltro] = useState<string | null>(null);
   const [mostrarListaVendedores, setMostrarListaVendedores] = useState(false);
+  const [somAlertaDesativado, setSomAlertaDesativado] = useState(false); // ✅ Novo estado para controlar som
 
   // ✅ timers persistentes por nunota
   const [timerByNunota, setTimerByNunota] = useState<TimerMap>(() => loadTimers());
@@ -283,6 +406,13 @@ export function PedidoList({
 
   // ✅ MODAL GLOBAL de atenção (pedido em alerta)
   const [pedidoEmAtencao, setPedidoEmAtencao] = useState<DetalhePedido | null>(null);
+
+  // ✅ Estado para controlar loading do botão de confirmação
+  const [loadingConfirmacao, setLoadingConfirmacao] = useState<number | null>(null);
+
+  // ✅ Refs para controle de som
+  const ultimoAlertaSomRef = useRef<number>(0);
+  const somIntervalRef = useRef<number | null>(null);
 
   // ⏱ força re-render 1x/segundo pro mm:ss andar
   const [, forceTick] = useState(0);
@@ -341,6 +471,89 @@ export function PedidoList({
       return next;
     });
   }, [pedidos]);
+
+  // ✅ Detecta pedidos que acabaram de entrar em AC (status aguardando conferência)
+  useEffect(() => {
+    if (!pedidos?.length || somAlertaDesativado) return;
+
+    // Verifica se algum pedido acabou de entrar em AC
+    pedidos.forEach((p) => {
+      const nunota = p.nunota;
+      const statusCode = normalizeStatus((p as any).statusConferencia);
+      const statusBase = statusMap[(p as any).statusConferencia] || "-";
+      
+      if (statusCode === "AC") {
+        const timer = timerByNunota[nunota];
+        // Se o timer acabou de começar (menos de 2 segundos)
+        if (timer?.running && timer.startAt) {
+          const tempoDesdeInicio = Date.now() - timer.startAt;
+          if (tempoDesdeInicio < 2000) { // Menos de 2 segundos
+            console.log("🔊 [SOM] Pedido entrou em AC:", nunota);
+            tocarSomAlerta();
+          }
+        }
+      }
+    });
+  }, [pedidos, timerByNunota, somAlertaDesativado]);
+
+  // ✅ Controle de som para pedidos com mais de 5 minutos
+  useEffect(() => {
+    if (!pedidos?.length || somAlertaDesativado) {
+      // Limpa intervalo se não há pedidos ou som está desativado
+      if (somIntervalRef.current) {
+        window.clearInterval(somIntervalRef.current);
+        somIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Encontra todos os pedidos em AC com mais de 5 minutos
+    const pedidosComMaisDe5Min = pedidos.filter((p) => {
+      const statusCode = normalizeStatus((p as any).statusConferencia);
+      if (statusCode !== "AC") return false;
+      
+      const timer = timerByNunota[p.nunota];
+      if (!timer) return false;
+      
+      const now = Date.now();
+      const elapsedMs = timer.running && timer.startAt 
+        ? timer.elapsedMs + (now - timer.startAt) 
+        : timer.elapsedMs;
+      
+      return elapsedMs >= 5 * 60 * 1000; // 5 minutos
+    });
+
+    // Se há pedidos com mais de 5 minutos, configura intervalo de som
+    if (pedidosComMaisDe5Min.length > 0) {
+      if (!somIntervalRef.current) {
+        console.log("🔊 [SOM] Configurando intervalo de som para pedidos com +5min");
+        somIntervalRef.current = window.setInterval(() => {
+          // Toca som a cada 5 segundos
+          const agora = Date.now();
+          if (agora - ultimoAlertaSomRef.current >= 5000) {
+            tocarSomAlerta();
+            ultimoAlertaSomRef.current = agora;
+            console.log("🔊 [SOM] Alerta periódico para pedidos com +5min");
+          }
+        }, 5000); // Verifica a cada 5 segundos
+      }
+    } else {
+      // Limpa intervalo se não há pedidos com mais de 5 minutos
+      if (somIntervalRef.current) {
+        window.clearInterval(somIntervalRef.current);
+        somIntervalRef.current = null;
+        console.log("🔊 [SOM] Intervalo de som limpo - nenhum pedido com +5min");
+      }
+    }
+
+    // Cleanup
+    return () => {
+      if (somIntervalRef.current) {
+        window.clearInterval(somIntervalRef.current);
+        somIntervalRef.current = null;
+      }
+    };
+  }, [pedidos, timerByNunota, somAlertaDesativado]);
 
   // ✅ Detecta GLOBALMENTE pedido em atenção (AC >= 5min e sem ACK) e liga modal
   useEffect(() => {
@@ -408,6 +621,41 @@ export function PedidoList({
     return () => window.clearInterval(id);
   }, [pedidoEmAtencao, selecionado?.nunota, onSelect]);
 
+  // ✅ Função para parar o som quando clicar no OK do modal
+  const handleAckModal = (nunota: number) => {
+    // Para o som imediatamente
+    if (somIntervalRef.current) {
+      window.clearInterval(somIntervalRef.current);
+      somIntervalRef.current = null;
+      console.log("🔊 [SOM] Intervalo de som parado via OK modal");
+    }
+    
+    // Salva o ACK no localStorage
+    const ack = loadAckMap();
+    ack[nunota] = true;
+    saveAckMap(ack);
+    
+    // Fecha o modal
+    setPedidoEmAtencao(null);
+  };
+
+  // ✅ Função para alternar o estado do som
+  const toggleSomAlerta = () => {
+    const novoEstado = !somAlertaDesativado;
+    setSomAlertaDesativado(novoEstado);
+    
+    if (novoEstado) {
+      // Se está desativando, para o som
+      if (somIntervalRef.current) {
+        window.clearInterval(somIntervalRef.current);
+        somIntervalRef.current = null;
+        console.log("🔊 [SOM] Alerta de +5min desativado pelo usuário");
+      }
+    } else {
+      console.log("🔊 [SOM] Alerta de +5min ativado pelo usuário");
+    }
+  };
+
   useEffect(() => {
     setPagina(1);
   }, [busca, somenteAguardando, vendedorFiltro]);
@@ -467,6 +715,9 @@ export function PedidoList({
 
   // ✅ fluxo final: salvar conferente + iniciar + imprimir
   async function confirmarConferenteEImprimir(p: DetalhePedido, conf: Conferente) {
+    // Define o estado de loading para este pedido específico
+    setLoadingConfirmacao(p.nunota);
+    
     try {
       console.log("🧑‍💼 [CONFERENTE] salvando no Mongo:", {
         nunota: p.nunota,
@@ -500,7 +751,7 @@ export function PedidoList({
       // seleciona o pedido (pra detalhar)
       onSelect(p);
 
-      // imprime (salvar como PDF)
+      // imprime com nome do arquivo personalizado
       imprimirExpedicao(p, conf);
 
       // fecha popover
@@ -509,6 +760,9 @@ export function PedidoList({
     } catch (e: any) {
       console.error("❌ erro salvar conferente / iniciar / imprimir:", e);
       alert("Erro ao salvar conferente / iniciar conferência / imprimir.");
+    } finally {
+      // Remove o estado de loading independente do resultado
+      setLoadingConfirmacao(null);
     }
   }
 
@@ -593,6 +847,15 @@ export function PedidoList({
             </div>
           )}
         </div>
+
+        {/* ✅ Botão para desativar/ativar o som de alerta de +5min */}
+        <button
+          className={`chip ${somAlertaDesativado ? "chip-inactive" : "chip-active"}`}
+          onClick={toggleSomAlerta}
+          title={`${somAlertaDesativado ? "Ativar" : "Desativar"} som de alerta para pedidos com +5min`}
+        >
+          {somAlertaDesativado ? "🔇 Som desativado" : "🔊 Som ativado"}
+        </button>
       </div>
 
       <div className="cards-grid">
@@ -627,6 +890,7 @@ export function PedidoList({
 
           const confExibicao = getConferenteExibicao(p);
           const printOpenThis = printNunotaOpen === p.nunota;
+          const isLoadingThis = loadingConfirmacao === p.nunota;
 
           return (
             <div
@@ -744,116 +1008,148 @@ export function PedidoList({
                         )}
                       </div>
 
-                      {/* 🖨 Botão Impressão + iniciar (somente em AC) */}
-                      {aguardando && (
-                        <>
-                          <button
-                            className="btn-start"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                      {/* 🖨 Botão Impressão SEMPRE VISÍVEL - removida condição de aguardando */}
+                      {/* ✅ Botão SEMPRE visível, mas com comportamento diferente por status */}
+                      <button
+                        className={`btn-start ${!aguardando ? "btn-start-inactive" : ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
 
-                              console.log("🖨️ [PRINT] clique no imprimir:", {
-                                nunota: p.nunota,
-                                temConferente: !!confExibicao,
-                                conferente: confExibicao?.nome ?? null,
-                              });
+                          console.log("🖨️ [PRINT] clique no imprimir:", {
+                            nunota: p.nunota,
+                            status: statusBase,
+                            temConferente: !!confExibicao,
+                            conferente: confExibicao?.nome ?? null,
+                          });
 
-                              // abre popover para escolher conferente desse pedido
-                              setPrintNunotaOpen(p.nunota);
+                          if (!aguardando) {
+                            // Se não está aguardando, apenas imprime sem iniciar conferência
+                            if (confExibicao) {
+                              imprimirExpedicao(p, confExibicao);
+                            } else {
+                              imprimirExpedicao(p);
+                            }
+                            return;
+                          }
 
-                              // se já tem (backend ou local), pré-seleciona
-                              const presetId = confExibicao?.codUsuario ?? "";
-                              setPrintConferenteId(presetId as any);
+                          // Se está aguardando, abre popover para escolher conferente e iniciar
+                          setPrintNunotaOpen(p.nunota);
+                          const presetId = confExibicao?.codUsuario ?? "";
+                          setPrintConferenteId(presetId as any);
+                        }}
+                        title={aguardando ? "Imprimir e iniciar conferência" : "Imprimir documento"}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        disabled={isLoadingThis}
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center" }}>
+                          🖨️ {!aguardando && ""}
+                        </span>
+                      </button>
+
+                      {/* Popover de seleção por pedido (só aparece para AC) */}
+                      {aguardando && printOpenThis && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            position: "absolute",
+                            right: 0,
+                            bottom: 52,
+                            width: 240,
+                            background: "rgba(255,255,255,0.98)",
+                            border: "1px solid rgba(0,0,0,0.12)",
+                            borderRadius: 14,
+                            boxShadow: "0 18px 60px rgba(0,0,0,0.20)",
+                            padding: 10,
+                            zIndex: 50,
+                          }}
+                        >
+                          <div style={{ fontWeight: 900, marginBottom: 8 }}>
+                            Selecionar conferente
+                          </div>
+
+                          <select
+                            className="select"
+                            value={printConferenteId}
+                            onChange={(e) => {
+                              const cod = Number(e.target.value || 0);
+                              const found =
+                                CONFERENTES.find((c) => c.codUsuario === cod) || null;
+                              console.log("✅ [PRINT] conferente selecionado:", found);
+                              setPrintConferenteId(found?.codUsuario ?? "");
                             }}
-                            title="Imprimir (vai pedir conferente e iniciar)"
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
+                            style={{ width: "100%", marginBottom: 10 }}
+                            disabled={isLoadingThis}
                           >
-                            <span style={{ display: "inline-flex", alignItems: "center" }}>🖨️</span>
-                          </button>
+                            <option value="">Escolha…</option>
+                            {CONFERENTES.map((c) => (
+                              <option key={c.codUsuario} value={c.codUsuario}>
+                                {c.nome}
+                              </option>
+                            ))}
+                          </select>
 
-                          {/* Popover de seleção por pedido */}
-                          {printOpenThis && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                position: "absolute",
-                                right: 0,
-                                bottom: 52,
-                                width: 240,
-                                background: "rgba(255,255,255,0.98)",
-                                border: "1px solid rgba(0,0,0,0.12)",
-                                borderRadius: 14,
-                                boxShadow: "0 18px 60px rgba(0,0,0,0.20)",
-                                padding: 10,
-                                zIndex: 50,
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button
+                              className="chip"
+                              onClick={() => {
+                                console.log("❎ [PRINT] cancelar popover:", p.nunota);
+                                setPrintNunotaOpen(null);
+                                setPrintConferenteId("");
+                              }}
+                              disabled={isLoadingThis}
+                            >
+                              Cancelar
+                            </button>
+
+                            <button
+                              className="chip chip-active"
+                              onClick={() => {
+                                const cod = Number(printConferenteId || 0);
+                                const found =
+                                  CONFERENTES.find((c) => c.codUsuario === cod) || null;
+
+                                console.log("✅ [PRINT] confirmar:", {
+                                  nunota: p.nunota,
+                                  conferente: found,
+                                });
+
+                                if (!found) {
+                                  alert("Selecione o conferente.");
+                                  return;
+                                }
+
+                                confirmarConferenteEImprimir(p, found);
+                              }}
+                              disabled={isLoadingThis}
+                              style={{ 
+                                position: 'relative',
+                                minWidth: '120px'
                               }}
                             >
-                              <div style={{ fontWeight: 900, marginBottom: 8 }}>
-                                Selecionar conferente
-                              </div>
-
-                              <select
-                                className="select"
-                                value={printConferenteId}
-                                onChange={(e) => {
-                                  const cod = Number(e.target.value || 0);
-                                  const found =
-                                    CONFERENTES.find((c) => c.codUsuario === cod) || null;
-                                  console.log("✅ [PRINT] conferente selecionado:", found);
-                                  setPrintConferenteId(found?.codUsuario ?? "");
-                                }}
-                                style={{ width: "100%", marginBottom: 10 }}
-                              >
-                                <option value="">Escolha…</option>
-                                {CONFERENTES.map((c) => (
-                                  <option key={c.codUsuario} value={c.codUsuario}>
-                                    {c.nome}
-                                  </option>
-                                ))}
-                              </select>
-
-                              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                                <button
-                                  className="chip"
-                                  onClick={() => {
-                                    console.log("❎ [PRINT] cancelar popover:", p.nunota);
-                                    setPrintNunotaOpen(null);
-                                    setPrintConferenteId("");
-                                  }}
-                                >
-                                  Cancelar
-                                </button>
-
-                                <button
-                                  className="chip chip-active"
-                                  onClick={() => {
-                                    const cod = Number(printConferenteId || 0);
-                                    const found =
-                                      CONFERENTES.find((c) => c.codUsuario === cod) || null;
-
-                                    console.log("✅ [PRINT] confirmar:", {
-                                      nunota: p.nunota,
-                                      conferente: found,
-                                    });
-
-                                    if (!found) {
-                                      alert("Selecione o conferente.");
-                                      return;
-                                    }
-
-                                    confirmarConferenteEImprimir(p, found);
-                                  }}
-                                >
-                                  Confirmar e imprimir
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </>
+                              {isLoadingThis ? (
+                                <>
+                                  <span style={{ 
+                                    display: 'inline-block',
+                                    width: '16px',
+                                    height: '16px',
+                                    border: '2px solid rgba(255,255,255,0.3)',
+                                    borderTop: '2px solid white',
+                                    borderRadius: '50%',
+                                    animation: 'spin 1s linear infinite',
+                                    marginRight: '8px'
+                                  }} />
+                                  Processando...
+                                </>
+                              ) : (
+                                'Confirmar e imprimir'
+                              )}
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -902,11 +1198,8 @@ export function PedidoList({
             <button
               className="attention-overlay-ok"
               onClick={() => {
-                const ack = loadAckMap();
-                ack[pedidoEmAtencao.nunota] = true;
-                saveAckMap(ack);
-                console.log("✅ [MODAL ATENÇÃO] OKk (ACK salvo):", pedidoEmAtencao.nunota);
-                setPedidoEmAtencao(null);
+                handleAckModal(pedidoEmAtencao.nunota);
+                console.log("✅ [MODAL ATENÇÃO] OK (ACK salvo e som parado):", pedidoEmAtencao.nunota);
               }}
             >
               OK
@@ -942,6 +1235,35 @@ export function PedidoList({
           </button>
         </div>
       </div>
+
+      {/* Estilos CSS para os novos componentes */}
+      <style>{`
+        .chip-inactive {
+          background-color: #f0f0f0;
+          color: #666;
+          border: 1px solid #ddd;
+        }
+        
+        .chip-inactive:hover {
+          background-color: #e5e5e5;
+        }
+        
+        .btn-start-inactive {
+          opacity: 0.7;
+          background-color: #e9ecef;
+          color: #6c757d;
+          border: 1px solid #dee2e6;
+        }
+        
+        .btn-start-inactive:hover {
+          background-color: #dee2e6;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
