@@ -413,6 +413,9 @@ export function PedidoList({
   // ✅ Refs para controle de som
   const ultimoAlertaSomRef = useRef<number>(0);
   const somIntervalRef = useRef<number | null>(null);
+  
+  // ✅ Novo: Rastreamento dos últimos status para detectar mudanças
+  const [ultimosStatus, setUltimosStatus] = useState<Record<number, string>>({});
 
   // ⏱ força re-render 1x/segundo pro mm:ss andar
   const [, forceTick] = useState(0);
@@ -472,28 +475,36 @@ export function PedidoList({
     });
   }, [pedidos]);
 
-  // ✅ Detecta pedidos que acabaram de entrar em AC (status aguardando conferência)
+  // ✅ CORREÇÃO: Detecta mudanças de status para AC e toca som
   useEffect(() => {
     if (!pedidos?.length || somAlertaDesativado) return;
-
-    // Verifica se algum pedido acabou de entrar em AC
+    
+    const novosStatus: Record<number, string> = {};
+    pedidos.forEach(p => {
+      novosStatus[p.nunota] = normalizeStatus((p as any).statusConferencia);
+    });
+    
+    // Detecta mudanças
     pedidos.forEach((p) => {
       const nunota = p.nunota;
-      const statusCode = normalizeStatus((p as any).statusConferencia);
+      const novoStatus = novosStatus[nunota];
+      const statusAnterior = ultimosStatus[nunota];
       
-      if (statusCode === "AC") {
-        const timer = timerByNunota[nunota];
-        // Se o timer acabou de começar (menos de 2 segundos)
-        if (timer?.running && timer.startAt) {
-          const tempoDesdeInicio = Date.now() - timer.startAt;
-          if (tempoDesdeInicio < 2000) { // Menos de 2 segundos
-            console.log("🔊 [SOM] Pedido entrou em AC:", nunota);
-            tocarSomAlerta();
-          }
-        }
+      // Se o status mudou para AC (independente do status anterior)
+      if (novoStatus === "AC" && statusAnterior !== "AC") {
+        console.log("🔊 [SOM] Status mudou para AC:", nunota, "anterior:", statusAnterior);
+        
+        // Dispara som com pequeno delay para garantir
+        setTimeout(() => {
+          tocarSomAlerta();
+        }, 100);
       }
     });
-  }, [pedidos, timerByNunota, somAlertaDesativado]);
+    
+    // Atualiza o registro de status
+    setUltimosStatus(novosStatus);
+    
+  }, [pedidos, somAlertaDesativado]);
 
   // ✅ Controle de som para pedidos com mais de 5 minutos
   useEffect(() => {
@@ -854,6 +865,18 @@ export function PedidoList({
           title={`${somAlertaDesativado ? "Ativar" : "Desativar"} som de alerta para pedidos com +5min`}
         >
           {somAlertaDesativado ? "🔇 Som desativado" : "🔊 Som ativado"}
+        </button>
+        
+        {/* Botão de teste temporário - pode remover depois */}
+        <button
+          className="chip"
+          onClick={() => {
+            console.log("🔊 Testando som manualmente");
+            tocarSomAlerta();
+          }}
+          style={{ marginLeft: '10px' }}
+        >
+          Testar Som
         </button>
       </div>
 
