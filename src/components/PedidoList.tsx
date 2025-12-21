@@ -480,7 +480,6 @@ export function PedidoList({
     pedidos.forEach((p) => {
       const nunota = p.nunota;
       const statusCode = normalizeStatus((p as any).statusConferencia);
-      const statusBase = statusMap[(p as any).statusConferencia] || "-";
       
       if (statusCode === "AC") {
         const timer = timerByNunota[nunota];
