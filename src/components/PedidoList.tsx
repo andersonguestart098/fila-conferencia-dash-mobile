@@ -246,7 +246,7 @@ function imprimirExpedicao(p: DetalhePedido, conferente?: Conferente | null) {
           </div>
           <div class="right">
             <p class="sub"><b>Emitido em:</b> ${escapeHtml(dtStr)}</p>
-            <p class="sub"><b>Conferente:</b> ${escapeHtml(conferente?.nome ?? "-")}</p>
+            <p class="sub"><b>Responsável pela emissão:</b> ${escapeHtml(conferente?.nome ?? "-")}</p>
           </div>
         </div>
 
