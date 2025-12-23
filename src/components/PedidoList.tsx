@@ -301,7 +301,7 @@ export function PedidoList({
   const [filtrosOpen, setFiltrosOpen] = useState(false);
   const [somAlertaDesativado, setSomAlertaDesativado] = useState(false);
 
-  const [conferentesBackend, setConferentesBackend] = useState<Conferente[]>(CONFERENTES);
+  const [conferentesBackend] = useState<Conferente[]>(CONFERENTES);
 
   const [timerByNunota, setTimerByNunota] = useState<TimerMap>(() => loadTimers());
 
