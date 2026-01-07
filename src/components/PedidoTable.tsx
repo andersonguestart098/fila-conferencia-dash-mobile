@@ -141,7 +141,6 @@ export function PedidoTable({
   pedidos,
   loadingInicial,
   erro,
-  selecionado, // mantido por compat
   onSelect,
   onRefresh,
 }: PedidoTableProps) {
@@ -484,7 +483,6 @@ export function PedidoTable({
                 style={{
                   position: "absolute",
                   left: 0,
-                  top: "110%",
                   zIndex: 9999,
                   minWidth: 280,
                   padding: 8,
