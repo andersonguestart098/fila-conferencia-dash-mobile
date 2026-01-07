@@ -18,9 +18,13 @@ interface PedidoTableProps {
 
 const ITENS_POR_PAGINA = 50;
 
-// 🔁 ajuste se teu backend usa outro path
-const ROTA_DEFINIR_CONFERENTE = "/api/conferencia/definir-conferente";
+// ✅ rotas REAIS do teu backend (ConferenciaController)
+const ROTA_INICIAR = "/api/conferencia/iniciar";
+const ROTA_DEFINIR_CONFERENTE = "/api/conferencia/conferente";
 const ROTA_FINALIZAR = "/api/conferencia/finalizar";
+
+// ⏳ por quanto tempo manter o "Finalizada OK" visual antes do backend atualizar
+const OPTIMISTIC_FINAL_TTL_MS = 45_000;
 
 const VENDEDORES: string[] = [
   "LUIS TIZONI",
@@ -137,6 +141,43 @@ function itemKey(item: any, idx: number) {
   return `${cod}-${idx}`;
 }
 
+// ✅ cache local: nunota -> nuconf (pra não chamar /iniciar sempre)
+type NuconfByNunota = Record<number, number>;
+function loadNuconfByNunota(): NuconfByNunota {
+  try {
+    return JSON.parse(localStorage.getItem("nuconfByNunota") || "{}");
+  } catch {
+    return {};
+  }
+}
+function saveNuconfByNunota(next: NuconfByNunota) {
+  try {
+    localStorage.setItem("nuconfByNunota", JSON.stringify(next));
+  } catch {}
+}
+
+// ✅ cache optimistic: nunota -> expiresAt
+type OptimisticFinalizedByNunota = Record<number, number>;
+function loadOptimisticFinalized(): OptimisticFinalizedByNunota {
+  try {
+    return JSON.parse(localStorage.getItem("optimisticFinalizedByNunota") || "{}");
+  } catch {
+    return {};
+  }
+}
+function saveOptimisticFinalized(next: OptimisticFinalizedByNunota) {
+  try {
+    localStorage.setItem("optimisticFinalizedByNunota", JSON.stringify(next));
+  } catch {}
+}
+
+// ✅ “cores verdes” pro estado final (quando a gente força visualmente)
+const FINAL_OK_COLORS = {
+  bg: "rgba(22, 163, 74, 0.10)",
+  border: "rgba(22, 163, 74, 0.55)",
+  text: "#16a34a",
+};
+
 export function PedidoTable({
   pedidos,
   loadingInicial,
@@ -159,6 +200,10 @@ export function PedidoTable({
   const [conferenteByNunota, setConferenteByNunota] = useState<ConferenteByNunota>(() =>
     loadConferenteByNunota()
   );
+  const [nuconfByNunota, setNuconfByNunota] = useState<NuconfByNunota>(() => loadNuconfByNunota());
+
+  const [optimisticFinalizedByNunota, setOptimisticFinalizedByNunota] =
+    useState<OptimisticFinalizedByNunota>(() => loadOptimisticFinalized());
 
   const [expandedNunota, setExpandedNunota] = useState<number | null>(null);
 
@@ -175,6 +220,14 @@ export function PedidoTable({
   // ✅ checklist state
   const [checkedByNunota, setCheckedByNunota] = useState<CheckedItemsByNunota>(() => loadCheckedItems());
 
+  // ✅ modal de sucesso
+  const [successModal, setSuccessModal] = useState<{
+    open: boolean;
+    nunota: number | null;
+    nuconf: number | null;
+    conferenteNome: string | null;
+  }>({ open: false, nunota: null, nuconf: null, conferenteNome: null });
+
   // ⏱ re-render 1x/segundo
   const [, forceTick] = useState(0);
   useEffect(() => {
@@ -182,15 +235,92 @@ export function PedidoTable({
     return () => window.clearInterval(id);
   }, []);
 
+  // 🧹 limpa optimistic vencido (1x/seg)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      setOptimisticFinalizedByNunota((prev) => {
+        let changed = false;
+        const next: OptimisticFinalizedByNunota = { ...prev };
+        for (const k of Object.keys(next)) {
+          const nunota = Number(k);
+          if (!nunota) continue;
+          if (Number(next[nunota] ?? 0) <= now) {
+            delete next[nunota];
+            changed = true;
+          }
+        }
+        if (changed) saveOptimisticFinalized(next);
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setFiltrosOpen(false);
+      if (e.key === "Escape" && successModal.open) setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null });
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [successModal.open]);
 
-  // Atualiza timers conforme status
+  function isOptimisticFinal(nunota: number) {
+    const exp = Number(optimisticFinalizedByNunota[nunota] ?? 0);
+    return exp > Date.now();
+  }
+
+  function marcarOptimisticFinal(nunota: number) {
+    const exp = Date.now() + OPTIMISTIC_FINAL_TTL_MS;
+    setOptimisticFinalizedByNunota((prev) => {
+      const next = { ...prev, [nunota]: exp };
+      saveOptimisticFinalized(next);
+      return next;
+    });
+  }
+
+  function removerOptimisticFinal(nunota: number) {
+    setOptimisticFinalizedByNunota((prev) => {
+      if (!(nunota in prev)) return prev;
+      const next = { ...prev };
+      delete next[nunota];
+      saveOptimisticFinalized(next);
+      return next;
+    });
+  }
+
+  function getVisualStatus(p: any): { label: string; colors: any; isFinalOk: boolean; isOptimistic: boolean } {
+    const statusBase = statusMap[(p as any).statusConferencia] || "-";
+    const isFinalizadaOk = statusBase === "Finalizada OK";
+
+    if (isFinalizadaOk) {
+      return {
+        label: "Finalizada OK",
+        colors: statusColors[(p as any).statusConferencia] || FINAL_OK_COLORS,
+        isFinalOk: true,
+        isOptimistic: false,
+      };
+    }
+
+    if (isOptimisticFinal(p.nunota)) {
+      return {
+        label: "Finalizada OK",
+        colors: FINAL_OK_COLORS,
+        isFinalOk: true,
+        isOptimistic: true,
+      };
+    }
+
+    return {
+      label: statusBase,
+      colors: statusColors[(p as any).statusConferencia] || statusColors.AL,
+      isFinalOk: false,
+      isOptimistic: false,
+    };
+  }
+
+  // Atualiza timers conforme status (considera optimistic como final ok)
   useEffect(() => {
     if (!pedidos?.length) return;
 
@@ -202,19 +332,22 @@ export function PedidoTable({
         const nunota = p.nunota;
         const statusCode = normalizeStatus((p as any).statusConferencia);
 
-        const statusBase = statusMap[(p as any).statusConferencia] || "-";
-        const isFinalizadaOk = statusBase === "Finalizada OK";
+        const visual = getVisualStatus(p);
+        const isFinalizadaOk = visual.isFinalOk;
+
+        // ✅ se backend já veio final ok, tira optimistic (se existir)
+        if (isFinalizadaOk && !visual.isOptimistic) removerOptimisticFinal(nunota);
 
         const current = next[nunota] ?? { startAt: null, elapsedMs: 0, running: false };
 
         // ✅ começa contar em AC
-        if (statusCode === "AC") {
+        if (statusCode === "AC" && !isFinalizadaOk) {
           if (!current.running) next[nunota] = { startAt: now, elapsedMs: current.elapsedMs, running: true };
           else next[nunota] = current;
           continue;
         }
 
-        // ✅ para de contar em "Finalizada OK"
+        // ✅ para de contar em "Finalizada OK" (ou optimistic final)
         if (isFinalizadaOk) {
           if (current.running && current.startAt) {
             const elapsed = current.elapsedMs + (now - current.startAt);
@@ -233,7 +366,8 @@ export function PedidoTable({
       saveTimers(next);
       return next;
     });
-  }, [pedidos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidos, optimisticFinalizedByNunota]);
 
   // Detecta mudança pra AC e toca som (entrada em AC)
   useEffect(() => {
@@ -250,7 +384,7 @@ export function PedidoTable({
     });
 
     setUltimosStatus(novosStatus);
-  }, [pedidos, somAlertaDesativado]);
+  }, [pedidos, somAlertaDesativado]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Som periódico +5min (SEM modal fullscreen)
   useEffect(() => {
@@ -264,6 +398,8 @@ export function PedidoTable({
 
     const pedidosComMaisDe5Min = pedidos.filter((p) => {
       if (normalizeStatus((p as any).statusConferencia) !== "AC") return false;
+      if (isOptimisticFinal(p.nunota)) return false;
+
       const timer = timerByNunota[p.nunota];
       if (!timer) return false;
 
@@ -297,7 +433,7 @@ export function PedidoTable({
         somIntervalRef.current = null;
       }
     };
-  }, [pedidos, timerByNunota, somAlertaDesativado]);
+  }, [pedidos, timerByNunota, somAlertaDesativado, optimisticFinalizedByNunota]);
 
   const toggleSomAlerta = () => {
     const novoEstado = !somAlertaDesativado;
@@ -312,12 +448,14 @@ export function PedidoTable({
   const sincronizarConferentes = () => {
     try {
       localStorage.removeItem("conferenteByNunota");
+      localStorage.removeItem("nuconfByNunota");
+      localStorage.removeItem("optimisticFinalizedByNunota");
       if (onRefresh) onRefresh();
-      alert("Conferentes sincronizados. Os dados serão atualizados.");
-      setTimeout(() => window.location.reload(), 1000);
+      alert("Cache sincronizado. Os dados serão atualizados.");
+      setTimeout(() => window.location.reload(), 800);
     } catch (error) {
-      console.error("Erro ao sincronizar conferentes:", error);
-      alert("Erro ao sincronizar conferentes.");
+      console.error("Erro ao sincronizar:", error);
+      alert("Erro ao sincronizar.");
     }
   };
 
@@ -381,20 +519,46 @@ export function PedidoTable({
     return conferenteByNunota[p.nunota] ?? null;
   }
 
-  async function definirConferenteNoBackend(nunota: number, codUsuario: number) {
+  // ✅ backend espera: { nunota, nome, codUsuario }
+  async function definirConferenteNoBackend(nunota: number, conf: Conferente) {
     const res = await api.post(ROTA_DEFINIR_CONFERENTE, {
-      nunotaOrig: nunota,
-      codUsuario,
+      nunota,
+      nome: conf.nome,
+      codUsuario: conf.codUsuario,
     });
     return res.data;
   }
 
-  async function finalizarConferenciaViaBackend(nunota: number, codUsuario: number) {
-    const res = await api.post(ROTA_FINALIZAR, {
-      nunotaOrig: nunota,
-      codUsuario,
-    });
+  // ✅ backend espera: { nunotaOrig, codUsuario } e devolve { nuconf, nunotaOrig }
+  async function iniciarEObterNuconf(nunotaOrig: number, codUsuario: number): Promise<number> {
+    const res = await api.post(ROTA_INICIAR, { nunotaOrig, codUsuario });
+    const nuconf = Number(res?.data?.nuconf ?? 0);
+    if (!nuconf) throw new Error(`Não consegui ler nuconf do /iniciar para o pedido #${nunotaOrig}`);
+    return nuconf;
+  }
+
+  // ✅ backend espera: { nuconf, codUsuario }
+  async function finalizarConferenciaViaBackend(nuconf: number, codUsuario: number) {
+    const res = await api.post(ROTA_FINALIZAR, { nuconf, codUsuario });
     return res.data;
+  }
+
+  async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<number> {
+    const payload = Number((p as any).nuconf ?? 0);
+    if (payload) return payload;
+
+    const cached = Number(nuconfByNunota[p.nunota] ?? 0);
+    if (cached) return cached;
+
+    const nuconf = await iniciarEObterNuconf(p.nunota, codUsuario);
+
+    setNuconfByNunota((prev) => {
+      const next = { ...prev, [p.nunota]: nuconf };
+      saveNuconfByNunota(next);
+      return next;
+    });
+
+    return nuconf;
   }
 
   async function confirmarConferenteEFinalizar(p: DetalhePedido, conf: Conferente) {
@@ -406,12 +570,29 @@ export function PedidoTable({
         return next;
       });
 
-      await definirConferenteNoBackend(p.nunota, conf.codUsuario);
-      await finalizarConferenciaViaBackend(p.nunota, conf.codUsuario);
+      // 1) define conferente por NUNOTA
+      await definirConferenteNoBackend(p.nunota, conf);
+
+      // 2) garante NUCONF
+      const nuconf = await garantirNuconf(p, conf.codUsuario);
+
+      // 3) finaliza
+      await finalizarConferenciaViaBackend(nuconf, conf.codUsuario);
+
+      // ✅ visual instantâneo + modal
+      marcarOptimisticFinal(p.nunota);
+
+      setSuccessModal({
+        open: true,
+        nunota: p.nunota,
+        nuconf,
+        conferenteNome: conf.nome,
+      });
 
       setFinalizarNunotaOpen(null);
       setFinalizarConferenteId("");
 
+      // chama refresh pra puxar backend; se demorar, optimistic segura a UI
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error("❌ erro ao finalizar:", err);
@@ -450,6 +631,51 @@ export function PedidoTable({
 
   return (
     <div>
+      {/* ✅ Modal sucesso */}
+      {successModal.open && (
+        <>
+          <div
+            className="modal-overlay"
+            onClick={() => setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null })}
+          />
+          <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-icon">✅</div>
+            <div className="modal-title">Conferência finalizada!</div>
+
+            <div className="modal-sub">
+              Pedido <b>#{successModal.nunota}</b> finalizado com sucesso.
+            </div>
+
+            <div className="modal-meta">
+              {successModal.nuconf ? (
+                <div>
+                  <span className="modal-badge">NUCONF</span> <b>{successModal.nuconf}</b>
+                </div>
+              ) : null}
+              {successModal.conferenteNome ? (
+                <div style={{ marginTop: 6 }}>
+                  <span className="modal-badge">Conferente</span> <b>{successModal.conferenteNome}</b>
+                </div>
+              ) : null}
+
+              <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
+                Atualizando status do backend… (pode levar alguns segundos)
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="chip chip-active"
+                onClick={() => setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null })}
+                style={{ minWidth: 140 }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Toolbar */}
       <div
         className="cards-toolbar"
@@ -533,7 +759,7 @@ export function PedidoTable({
         </div>
 
         <button className="chip" onClick={sincronizarConferentes} style={{ backgroundColor: "#2196F3", color: "white" }}>
-          🔄 Sinc. Conferentes
+          🔄 Sync cache
         </button>
 
         <button
@@ -571,9 +797,10 @@ export function PedidoTable({
               const statusCode = normalizeStatus((p as any).statusConferencia);
               const podeFinalizarAgora = podeFinalizar(statusCode);
 
-              const colors = statusColors[(p as any).statusConferencia] || statusColors.AL;
-              const statusBase = statusMap[(p as any).statusConferencia] || "-";
-              const isFinalizadaOk = statusBase === "Finalizada OK";
+              const visual = getVisualStatus(p);
+              const colors = visual.colors;
+              const statusLabel = visual.label;
+              const isFinalizadaOk = visual.isFinalOk;
 
               const timer = timerByNunota[p.nunota] ?? { startAt: null, elapsedMs: 0, running: false };
               const now = Date.now();
@@ -581,7 +808,7 @@ export function PedidoTable({
                 timer.running && timer.startAt ? timer.elapsedMs + (now - timer.startAt) : timer.elapsedMs;
 
               const elapsedMin = Math.floor(liveElapsedMs / 60000);
-              const alerta5min = statusCode === "AC" && elapsedMin >= 5;
+              const alerta5min = statusCode === "AC" && elapsedMin >= 5 && !isOptimisticFinal(p.nunota);
 
               const confExibicao = getConferenteExibicao(p);
               const nomeConferenteTexto =
@@ -623,10 +850,11 @@ export function PedidoTable({
                       <span
                         className="status-pill"
                         style={{ backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }}
-                        title={statusBase}
+                        title={statusLabel}
                       >
                         <span className="status-dot" style={{ backgroundColor: colors.text }} />
-                        {statusBase}
+                        {statusLabel}
+                        {visual.isOptimistic && <span className="tag-5min">atualizando…</span>}
                         {alerta5min && <span className="tag-5min">+5min</span>}
                       </span>
                     </td>
@@ -788,7 +1016,6 @@ export function PedidoTable({
                                       </div>
                                     </div>
 
-                                    {/* ✅ botão circular SEM bolinha interna: aparece só o "V" quando marcado */}
                                     <button
                                       type="button"
                                       className={`circle-check ${checked ? "circle-check-on" : ""}`}
@@ -966,14 +1193,11 @@ export function PedidoTable({
         }
         .circle-check:hover{ filter: brightness(0.98); transform: translateY(-1px); }
         .circle-check:active{ transform: translateY(0px); }
-
-        /* ✅ marcado: fundo verde NORMAL + V branco */
         .circle-check-on{
           border-color: #16a34a;
           background: #16a34a;
         }
         .circle-check-on:hover{ filter: brightness(0.96); }
-
         .circle-check-v{
           color: #fff;
           font-weight: 1000;
@@ -987,6 +1211,67 @@ export function PedidoTable({
           0% { box-shadow: inset 0 0 0 rgba(255,0,0,0); }
           50% { box-shadow: inset 0 0 0 999px rgba(255, 0, 0, 0.04); }
           100% { box-shadow: inset 0 0 0 rgba(255,0,0,0); }
+        }
+
+        /* ✅ modal bonito */
+        .modal-overlay{
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.35);
+          backdrop-filter: blur(3px);
+          z-index: 99999;
+        }
+        .modal-card{
+          position: fixed;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: min(520px, calc(100vw - 24px));
+          background: rgba(255,255,255,0.98);
+          border: 1px solid rgba(0,0,0,0.12);
+          border-radius: 18px;
+          box-shadow: 0 24px 80px rgba(0,0,0,0.25);
+          padding: 16px 16px 14px 16px;
+          z-index: 100000;
+        }
+        .modal-icon{
+          width: 54px;
+          height: 54px;
+          border-radius: 999px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          background: rgba(22, 163, 74, 0.12);
+          border: 1px solid rgba(22, 163, 74, 0.35);
+          font-size: 26px;
+          margin-bottom: 10px;
+        }
+        .modal-title{
+          font-weight: 1000;
+          font-size: 18px;
+          margin-bottom: 6px;
+        }
+        .modal-sub{
+          opacity: 0.9;
+          margin-bottom: 10px;
+        }
+        .modal-meta{
+          border-radius: 14px;
+          border: 1px solid rgba(0,0,0,0.08);
+          background: rgba(0,0,0,0.02);
+          padding: 10px 12px;
+        }
+        .modal-badge{
+          display:inline-block;
+          font-size: 11px;
+          font-weight: 900;
+          opacity: .75;
+          margin-right: 8px;
+        }
+        .modal-actions{
+          display:flex;
+          justify-content:flex-end;
+          margin-top: 12px;
         }
       `}</style>
     </div>

@@ -21,6 +21,7 @@ export interface ItemConferencia {
 export interface DetalhePedido {
   nunota: number;
   numNota?: number | null;
+  nuconf?: number | null;
 
   statusConferencia: string; // "AC", "A", "R", etc.
 
