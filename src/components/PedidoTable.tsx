@@ -26,7 +26,7 @@ const ROTA_DEFINIR_CONFERENTE = "/api/conferencia/conferente";
 const ROTA_FINALIZAR = "/api/conferencia/finalizar";
 
 // ⏳ por quanto tempo manter o "Finalizada OK" visual antes do backend atualizar
-const OPTIMISTIC_FINAL_TTL_MS = 45_000;
+const OPTIMISTIC_FINAL_TTL_MS = 65_000;
 
 const VENDEDORES: string[] = [
   "LUIS TIZONI",
