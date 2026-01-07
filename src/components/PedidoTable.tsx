@@ -1,9 +1,11 @@
 // src/components/PedidoTable.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { DetalhePedido } from "../types/conferencia";
 import { statusColors, statusMap } from "../config/status";
 import { dispararAlertasVoz } from "../../public/audio/audioManager";
 import { api } from "../api/client";
+import { Portal } from "./Portal";
 
 interface PedidoTableProps {
   pedidos: DetalhePedido[];
@@ -178,13 +180,7 @@ const FINAL_OK_COLORS = {
   text: "#16a34a",
 };
 
-export function PedidoTable({
-  pedidos,
-  loadingInicial,
-  erro,
-  onSelect,
-  onRefresh,
-}: PedidoTableProps) {
+export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh }: PedidoTableProps) {
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(1);
 
@@ -197,9 +193,7 @@ export function PedidoTable({
   const [conferentesBackend] = useState<Conferente[]>(CONFERENTES);
 
   const [timerByNunota, setTimerByNunota] = useState<TimerMap>(() => loadTimers());
-  const [conferenteByNunota, setConferenteByNunota] = useState<ConferenteByNunota>(() =>
-    loadConferenteByNunota()
-  );
+  const [conferenteByNunota, setConferenteByNunota] = useState<ConferenteByNunota>(() => loadConferenteByNunota());
   const [nuconfByNunota, setNuconfByNunota] = useState<NuconfByNunota>(() => loadNuconfByNunota());
 
   const [optimisticFinalizedByNunota, setOptimisticFinalizedByNunota] =
@@ -207,7 +201,7 @@ export function PedidoTable({
 
   const [expandedNunota, setExpandedNunota] = useState<number | null>(null);
 
-  // popover de finalizar
+  // modal de finalizar
   const [finalizarNunotaOpen, setFinalizarNunotaOpen] = useState<number | null>(null);
   const [finalizarConferenteId, setFinalizarConferenteId] = useState<number | "">("");
 
@@ -217,10 +211,8 @@ export function PedidoTable({
   const somIntervalRef = useRef<number | null>(null);
   const [ultimosStatus, setUltimosStatus] = useState<Record<number, string>>({});
 
-  // ✅ checklist state
   const [checkedByNunota, setCheckedByNunota] = useState<CheckedItemsByNunota>(() => loadCheckedItems());
 
-  // ✅ modal de sucesso
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
     nunota: number | null;
@@ -228,14 +220,12 @@ export function PedidoTable({
     conferenteNome: string | null;
   }>({ open: false, nunota: null, nuconf: null, conferenteNome: null });
 
-  // ⏱ re-render 1x/segundo
   const [, forceTick] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => forceTick((x) => x + 1), 1000);
     return () => window.clearInterval(id);
   }, []);
 
-  // 🧹 limpa optimistic vencido (1x/seg)
   useEffect(() => {
     const id = window.setInterval(() => {
       const now = Date.now();
@@ -259,12 +249,34 @@ export function PedidoTable({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setFiltrosOpen(false);
-      if (e.key === "Escape" && successModal.open) setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null });
+      if (e.key !== "Escape") return;
+
+      setFiltrosOpen(false);
+
+      if (successModal.open) {
+        setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null });
+      }
+
+      if (finalizarNunotaOpen !== null && loadingConfirmacao === null) {
+        setFinalizarNunotaOpen(null);
+        setFinalizarConferenteId("");
+      }
     }
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [successModal.open]);
+  }, [successModal.open, finalizarNunotaOpen, loadingConfirmacao]);
+
+  useEffect(() => {
+    const anyOpen = successModal.open || finalizarNunotaOpen !== null;
+    if (!anyOpen) return;
+
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [successModal.open, finalizarNunotaOpen]);
 
   function isOptimisticFinal(nunota: number) {
     const exp = Number(optimisticFinalizedByNunota[nunota] ?? 0);
@@ -320,7 +332,6 @@ export function PedidoTable({
     };
   }
 
-  // Atualiza timers conforme status (considera optimistic como final ok)
   useEffect(() => {
     if (!pedidos?.length) return;
 
@@ -335,19 +346,16 @@ export function PedidoTable({
         const visual = getVisualStatus(p);
         const isFinalizadaOk = visual.isFinalOk;
 
-        // ✅ se backend já veio final ok, tira optimistic (se existir)
         if (isFinalizadaOk && !visual.isOptimistic) removerOptimisticFinal(nunota);
 
         const current = next[nunota] ?? { startAt: null, elapsedMs: 0, running: false };
 
-        // ✅ começa contar em AC
         if (statusCode === "AC" && !isFinalizadaOk) {
           if (!current.running) next[nunota] = { startAt: now, elapsedMs: current.elapsedMs, running: true };
           else next[nunota] = current;
           continue;
         }
 
-        // ✅ para de contar em "Finalizada OK" (ou optimistic final)
         if (isFinalizadaOk) {
           if (current.running && current.startAt) {
             const elapsed = current.elapsedMs + (now - current.startAt);
@@ -356,7 +364,6 @@ export function PedidoTable({
           continue;
         }
 
-        // ✅ qualquer outro status pausa o timer
         if (current.running && current.startAt) {
           const elapsed = current.elapsedMs + (now - current.startAt);
           next[nunota] = { startAt: null, elapsedMs: elapsed, running: false };
@@ -369,7 +376,6 @@ export function PedidoTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidos, optimisticFinalizedByNunota]);
 
-  // Detecta mudança pra AC e toca som (entrada em AC)
   useEffect(() => {
     if (!pedidos?.length || somAlertaDesativado) return;
 
@@ -386,7 +392,6 @@ export function PedidoTable({
     setUltimosStatus(novosStatus);
   }, [pedidos, somAlertaDesativado]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Som periódico +5min (SEM modal fullscreen)
   useEffect(() => {
     if (!pedidos?.length || somAlertaDesativado) {
       if (somIntervalRef.current) {
@@ -404,8 +409,7 @@ export function PedidoTable({
       if (!timer) return false;
 
       const now = Date.now();
-      const elapsedMs =
-        timer.running && timer.startAt ? timer.elapsedMs + (now - timer.startAt) : timer.elapsedMs;
+      const elapsedMs = timer.running && timer.startAt ? timer.elapsedMs + (now - timer.startAt) : timer.elapsedMs;
 
       return elapsedMs >= 5 * 60 * 1000;
     });
@@ -468,8 +472,7 @@ export function PedidoTable({
     let base = pedidos;
 
     if (somenteAguardando) base = base.filter((p) => normalizeStatus((p as any).statusConferencia) === "AC");
-    if (vendedorFiltro)
-      base = base.filter((p) => (p.nomeVendedor ?? "").toLowerCase() === vendedorFiltro.toLowerCase());
+    if (vendedorFiltro) base = base.filter((p) => (p.nomeVendedor ?? "").toLowerCase() === vendedorFiltro.toLowerCase());
     if (!termo) return base;
 
     return base.filter((p) => {
@@ -519,7 +522,6 @@ export function PedidoTable({
     return conferenteByNunota[p.nunota] ?? null;
   }
 
-  // ✅ backend espera: { nunota, nome, codUsuario }
   async function definirConferenteNoBackend(nunota: number, conf: Conferente) {
     const res = await api.post(ROTA_DEFINIR_CONFERENTE, {
       nunota,
@@ -529,7 +531,6 @@ export function PedidoTable({
     return res.data;
   }
 
-  // ✅ backend espera: { nunotaOrig, codUsuario } e devolve { nuconf, nunotaOrig }
   async function iniciarEObterNuconf(nunotaOrig: number, codUsuario: number): Promise<number> {
     const res = await api.post(ROTA_INICIAR, { nunotaOrig, codUsuario });
     const nuconf = Number(res?.data?.nuconf ?? 0);
@@ -537,7 +538,6 @@ export function PedidoTable({
     return nuconf;
   }
 
-  // ✅ backend espera: { nuconf, codUsuario }
   async function finalizarConferenciaViaBackend(nuconf: number, codUsuario: number) {
     const res = await api.post(ROTA_FINALIZAR, { nuconf, codUsuario });
     return res.data;
@@ -570,16 +570,12 @@ export function PedidoTable({
         return next;
       });
 
-      // 1) define conferente por NUNOTA
       await definirConferenteNoBackend(p.nunota, conf);
 
-      // 2) garante NUCONF
       const nuconf = await garantirNuconf(p, conf.codUsuario);
 
-      // 3) finaliza
       await finalizarConferenciaViaBackend(nuconf, conf.codUsuario);
 
-      // ✅ visual instantâneo + modal
       marcarOptimisticFinal(p.nunota);
 
       setSuccessModal({
@@ -592,10 +588,21 @@ export function PedidoTable({
       setFinalizarNunotaOpen(null);
       setFinalizarConferenteId("");
 
-      // chama refresh pra puxar backend; se demorar, optimistic segura a UI
       if (onRefresh) onRefresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("❌ erro ao finalizar:", err);
+
+      const status = err?.response?.status;
+      const msgBackend = err?.response?.data?.message || err?.response?.data?.error;
+
+      if (status === 409) {
+        alert(msgBackend || "Este pedido já foi finalizado por outro usuário.");
+        if (onRefresh) onRefresh();
+        setFinalizarNunotaOpen(null);
+        setFinalizarConferenteId("");
+        return;
+      }
+
       alert("Não consegui finalizar a conferência. Verifique o backend/logs.");
     } finally {
       setLoadingConfirmacao(null);
@@ -629,58 +636,280 @@ export function PedidoTable({
   if (loadingInicial && pedidos.length === 0) return <div className="center">Carregando…</div>;
   if (erro && pedidos.length === 0) return <div className="center">{erro}</div>;
 
+  // ✅ estilos inline do modal (tipado sem React.CSSProperties pra não brigar com verbatimModuleSyntax)
+  const overlayStyle: CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.45)",
+    zIndex: 200000,
+  };
+
+  const modalStyle: CSSProperties = {
+    position: "fixed",
+    left: "50%",
+    top: "50%",
+    transform: "translate(-50%, -50%)",
+    width: "min(860px, calc(100vw - 28px))",
+    background: "rgba(255,255,255,0.98)",
+    border: "1px solid rgba(0,0,0,0.14)",
+    borderRadius: 18,
+    boxShadow: "0 30px 90px rgba(0,0,0,0.28)",
+    zIndex: 200001,
+    overflow: "hidden",
+  };
+
+  const spinnerWhite: CSSProperties = {
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    border: "2px solid rgba(255,255,255,0.45)",
+    borderTopColor: "rgba(255,255,255,1)",
+    animation: "spin 0.9s linear infinite",
+  };
+
   return (
     <div>
-      {/* ✅ Modal sucesso */}
+      {/* ✅ Modal sucesso (PORTAL) */}
       {successModal.open && (
-        <>
-          <div
-            className="modal-overlay"
-            onClick={() => setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null })}
-          />
-          <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-icon">✅</div>
-            <div className="modal-title">Conferência finalizada!</div>
+        <Portal>
+          <>
+            <div
+              className="modal-overlay"
+              onClick={() => setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null })}
+            />
+            <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-icon">✅</div>
+              <div className="modal-title">Conferência finalizada!</div>
 
-            <div className="modal-sub">
-              Pedido <b>#{successModal.nunota}</b> finalizado com sucesso.
-            </div>
+              <div className="modal-sub">
+                Pedido <b>#{successModal.nunota}</b> finalizado com sucesso.
+              </div>
 
-            <div className="modal-meta">
-              {successModal.nuconf ? (
-                <div>
-                  <span className="modal-badge">NUCONF</span> <b>{successModal.nuconf}</b>
+              <div className="modal-meta">
+                {successModal.nuconf ? (
+                  <div>
+                    <span className="modal-badge">NUCONF</span> <b>{successModal.nuconf}</b>
+                  </div>
+                ) : null}
+                {successModal.conferenteNome ? (
+                  <div style={{ marginTop: 6 }}>
+                    <span className="modal-badge">Conferente</span> <b>{successModal.conferenteNome}</b>
+                  </div>
+                ) : null}
+
+                <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
+                  Atualizando status do backend… (pode levar alguns segundos)
                 </div>
-              ) : null}
-              {successModal.conferenteNome ? (
-                <div style={{ marginTop: 6 }}>
-                  <span className="modal-badge">Conferente</span> <b>{successModal.conferenteNome}</b>
-                </div>
-              ) : null}
+              </div>
 
-              <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
-                Atualizando status do backend… (pode levar alguns segundos)
+              <div className="modal-actions">
+                <button
+                  className="chip chip-active"
+                  onClick={() => setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null })}
+                  style={{ minWidth: 140 }}
+                >
+                  OK
+                </button>
               </div>
             </div>
-
-            <div className="modal-actions">
-              <button
-                className="chip chip-active"
-                onClick={() => setSuccessModal({ open: false, nunota: null, nuconf: null, conferenteNome: null })}
-                style={{ minWidth: 140 }}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </>
+          </>
+        </Portal>
       )}
 
+      {/* ✅ Modal FINALIZAR (PORTAL) */}
+      {finalizarNunotaOpen !== null &&
+        (() => {
+          const p = pedidos.find((x) => x.nunota === finalizarNunotaOpen);
+          if (!p) return null;
+
+          const isLoadingThis = loadingConfirmacao === p.nunota;
+
+          return (
+            <Portal>
+              <>
+                <div
+                  style={overlayStyle}
+                  onClick={() => {
+                    if (isLoadingThis) return;
+                    setFinalizarNunotaOpen(null);
+                    setFinalizarConferenteId("");
+                  }}
+                />
+
+                <div style={modalStyle} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "18px 18px 12px 18px",
+                      borderBottom: "1px solid rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 1000, fontSize: 20 }}>Finalizar conferência</div>
+                      <div style={{ marginTop: 4, fontSize: 13, opacity: 0.8, fontWeight: 700 }}>
+                        Pedido <b>#{p.nunota}</b>
+                        {p.numNota ? (
+                          <>
+                            {" "}
+                            · NF <b>{p.numNota}</b>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (isLoadingThis) return;
+                        setFinalizarNunotaOpen(null);
+                        setFinalizarConferenteId("");
+                      }}
+                      disabled={isLoadingThis}
+                      title="Fechar"
+                      style={{
+                        border: 0,
+                        background: "rgba(0,0,0,0.05)",
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        cursor: isLoadingThis ? "not-allowed" : "pointer",
+                        fontWeight: 900,
+                        opacity: isLoadingThis ? 0.6 : 1,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div style={{ padding: "16px 18px 18px 18px" }}>
+                    <div style={{ fontWeight: 900, marginBottom: 10 }}>Selecionar conferente</div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1.2fr 0.8fr",
+                        gap: 14,
+                      }}
+                    >
+                      <div
+                        style={{
+                          border: "1px solid rgba(0,0,0,0.08)",
+                          borderRadius: 14,
+                          padding: 14,
+                          background: "rgba(0,0,0,0.015)",
+                        }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 900, opacity: 0.75, marginBottom: 8 }}>Conferente</div>
+
+                        <select
+                          className="select"
+                          value={finalizarConferenteId}
+                          onChange={(e) => {
+                            const cod = Number(e.target.value || 0);
+                            const found = conferentesBackend.find((c) => c.codUsuario === cod) || null;
+                            setFinalizarConferenteId(found?.codUsuario ?? "");
+                          }}
+                          style={{ width: "100%" }}
+                          disabled={isLoadingThis}
+                        >
+                          <option value="">Escolha…</option>
+                          {conferentesBackend.map((c) => (
+                            <option key={c.codUsuario} value={c.codUsuario}>
+                              {c.nome}
+                            </option>
+                          ))}
+                        </select>
+
+                        <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12 }}>
+                          Ao confirmar, vamos definir o conferente e finalizar a conferência.
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          border: "1px solid rgba(0,0,0,0.08)",
+                          borderRadius: 14,
+                          padding: 14,
+                          background: "rgba(0,0,0,0.015)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 1000, marginBottom: 10 }}>Resumo</div>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0" }}>
+                          <span style={{ opacity: 0.8 }}>Cliente</span>
+                          <b>{p.nomeParc ?? "-"}</b>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0" }}>
+                          <span style={{ opacity: 0.8 }}>Vendedor</span>
+                          <b>{p.nomeVendedor ?? "-"}</b>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0" }}>
+                          <span style={{ opacity: 0.8 }}>Itens</span>
+                          <b>{p.itens?.length ?? 0}</b>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      gap: 10,
+                      padding: "12px 18px 18px 18px",
+                      borderTop: "1px solid rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <button
+                      className="chip"
+                      onClick={() => {
+                        if (isLoadingThis) return;
+                        setFinalizarNunotaOpen(null);
+                        setFinalizarConferenteId("");
+                      }}
+                      disabled={isLoadingThis}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      className="chip chip-active"
+                      onClick={() => {
+                        const cod = Number(finalizarConferenteId || 0);
+                        const found = conferentesBackend.find((c) => c.codUsuario === cod) || null;
+                        if (!found) return alert("Selecione o conferente.");
+                        confirmarConferenteEFinalizar(p, found);
+                      }}
+                      disabled={isLoadingThis}
+                      style={{
+                        minWidth: 260,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 10,
+                        opacity: isLoadingThis ? 0.92 : 1,
+                      }}
+                    >
+                      {isLoadingThis ? (
+                        <>
+                          <span style={spinnerWhite} />
+                          Finalizando...
+                        </>
+                      ) : (
+                        "Confirmar e finalizar"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            </Portal>
+          );
+        })()}
+
       {/* Toolbar */}
-      <div
-        className="cards-toolbar"
-        style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}
-      >
+      <div className="cards-toolbar" style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
         <input
           className="input"
           placeholder="Buscar por cliente, vendedor ou número..."
@@ -700,10 +929,7 @@ export function PedidoTable({
 
           {filtrosOpen && (
             <>
-              <div
-                onClick={() => setFiltrosOpen(false)}
-                style={{ position: "fixed", inset: 0, zIndex: 9998, background: "transparent" }}
-              />
+              <div onClick={() => setFiltrosOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9998, background: "transparent" }} />
               <div
                 className="dropdown"
                 style={{
@@ -804,8 +1030,7 @@ export function PedidoTable({
 
               const timer = timerByNunota[p.nunota] ?? { startAt: null, elapsedMs: 0, running: false };
               const now = Date.now();
-              const liveElapsedMs =
-                timer.running && timer.startAt ? timer.elapsedMs + (now - timer.startAt) : timer.elapsedMs;
+              const liveElapsedMs = timer.running && timer.startAt ? timer.elapsedMs + (now - timer.startAt) : timer.elapsedMs;
 
               const elapsedMin = Math.floor(liveElapsedMs / 60000);
               const alerta5min = statusCode === "AC" && elapsedMin >= 5 && !isOptimisticFinal(p.nunota);
@@ -818,9 +1043,7 @@ export function PedidoTable({
                 confExibicao?.nome ??
                 "(não definido)";
 
-              const popoverOpenThis = finalizarNunotaOpen === p.nunota;
               const isLoadingThis = loadingConfirmacao === p.nunota;
-
               const disabledFinalizar = !podeFinalizarAgora || isFinalizadaOk || isLoadingThis;
 
               return (
@@ -867,7 +1090,7 @@ export function PedidoTable({
 
                     <td>{nomeConferenteTexto}</td>
 
-                    <td style={{ textAlign: "right", position: "relative" }}>
+                    <td style={{ textAlign: "right" }}>
                       <button
                         className={`btn-finalizar ${disabledFinalizar ? "btn-finalizar-inactive" : ""}`}
                         onClick={(e) => {
@@ -887,58 +1110,6 @@ export function PedidoTable({
                       >
                         Finalizar
                       </button>
-
-                      {podeFinalizarAgora && !isFinalizadaOk && popoverOpenThis && (
-                        <div className="finalizar-popover" onClick={(e) => e.stopPropagation()}>
-                          <div style={{ fontWeight: 900, marginBottom: 8 }}>Selecionar conferente</div>
-
-                          <select
-                            className="select"
-                            value={finalizarConferenteId}
-                            onChange={(e) => {
-                              const cod = Number(e.target.value || 0);
-                              const found = conferentesBackend.find((c) => c.codUsuario === cod) || null;
-                              setFinalizarConferenteId(found?.codUsuario ?? "");
-                            }}
-                            style={{ width: "100%", marginBottom: 10 }}
-                            disabled={isLoadingThis}
-                          >
-                            <option value="">Escolha…</option>
-                            {conferentesBackend.map((c) => (
-                              <option key={c.codUsuario} value={c.codUsuario}>
-                                {c.nome}
-                              </option>
-                            ))}
-                          </select>
-
-                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                            <button
-                              className="chip"
-                              onClick={() => {
-                                setFinalizarNunotaOpen(null);
-                                setFinalizarConferenteId("");
-                              }}
-                              disabled={isLoadingThis}
-                            >
-                              Cancelar
-                            </button>
-
-                            <button
-                              className="chip chip-active"
-                              onClick={() => {
-                                const cod = Number(finalizarConferenteId || 0);
-                                const found = conferentesBackend.find((c) => c.codUsuario === cod) || null;
-                                if (!found) return alert("Selecione o conferente.");
-                                confirmarConferenteEFinalizar(p, found);
-                              }}
-                              disabled={isLoadingThis}
-                              style={{ minWidth: 140 }}
-                            >
-                              {isLoadingThis ? "Processando..." : "Confirmar"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </td>
                   </tr>
 
@@ -946,10 +1117,7 @@ export function PedidoTable({
                     <tr className="row-detail">
                       <td colSpan={7}>
                         <div className="detail-box">
-                          <div
-                            className="detail-box-title"
-                            style={{ display: "flex", justifyContent: "space-between", gap: 10 }}
-                          >
+                          <div className="detail-box-title" style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                             <div>Itens do pedido #{p.nunota}</div>
 
                             {(() => {
@@ -1058,11 +1226,7 @@ export function PedidoTable({
           <div className="chip">
             {pagina}/{totalPaginas}
           </div>
-          <button
-            className="chip"
-            disabled={pagina >= totalPaginas}
-            onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-          >
+          <button className="chip" disabled={pagina >= totalPaginas} onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}>
             →
           </button>
         </div>
@@ -1140,19 +1304,6 @@ export function PedidoTable({
         }
         .btn-finalizar-inactive:hover { transform: none; filter: none; }
 
-        .finalizar-popover {
-          position: absolute;
-          right: 0;
-          top: 42px;
-          width: 260px;
-          background: rgba(255,255,255,0.98);
-          border: 1px solid rgba(0,0,0,0.12);
-          border-radius: 14px;
-          box-shadow: 0 18px 60px rgba(0,0,0,0.20);
-          padding: 10px;
-          z-index: 50;
-        }
-
         .row-detail td { background: rgba(0,0,0,0.02); }
         .detail-box { padding: 12px; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); background: rgba(255,255,255,0.9); }
         .detail-box-title { font-weight: 900; margin-bottom: 10px; }
@@ -1176,7 +1327,6 @@ export function PedidoTable({
         .item-title{ font-weight: 900; }
         .item-sub{ opacity: .8; font-size: 12px; }
 
-        /* ✅ checkbox circular grande */
         .circle-check{
           flex: 0 0 auto;
           width: 52px;
@@ -1213,7 +1363,7 @@ export function PedidoTable({
           100% { box-shadow: inset 0 0 0 rgba(255,0,0,0); }
         }
 
-        /* ✅ modal bonito */
+        /* ✅ modal sucesso */
         .modal-overlay{
           position: fixed;
           inset: 0;
@@ -1272,6 +1422,11 @@ export function PedidoTable({
           display:flex;
           justify-content:flex-end;
           margin-top: 12px;
+        }
+
+        /* animação usada pelo spinner inline */
+        @keyframes spin{
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
