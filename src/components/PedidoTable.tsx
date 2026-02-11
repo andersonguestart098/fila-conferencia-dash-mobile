@@ -138,9 +138,25 @@ function saveCheckedItems(next: CheckedItemsByNunota) {
     localStorage.setItem("checkedItemsByNunota", JSON.stringify(next));
   } catch {}
 }
+
 function itemKey(item: any, idx: number) {
   const cod = item?.codProd ?? item?.codigo ?? "X";
   return `${cod}-${idx}`;
+}
+
+// ✅ NOVO: quantidade conferida por item (localStorage)
+type QtdByNunota = Record<number, Record<string, number | "">>;
+function loadQtdByNunota(): QtdByNunota {
+  try {
+    return JSON.parse(localStorage.getItem("qtdConferidaByNunota") || "{}");
+  } catch {
+    return {};
+  }
+}
+function saveQtdByNunota(next: QtdByNunota) {
+  try {
+    localStorage.setItem("qtdConferidaByNunota", JSON.stringify(next));
+  } catch {}
 }
 
 // ✅ cache local: nunota -> nuconf (pra não chamar /iniciar sempre)
@@ -212,6 +228,9 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
   const [ultimosStatus, setUltimosStatus] = useState<Record<number, string>>({});
 
   const [checkedByNunota, setCheckedByNunota] = useState<CheckedItemsByNunota>(() => loadCheckedItems());
+
+  // ✅ qtd digitada por item
+  const [qtdByNunota, setQtdByNunota] = useState<QtdByNunota>(() => loadQtdByNunota());
 
   const [successModal, setSuccessModal] = useState<{
     open: boolean;
@@ -454,6 +473,10 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
       localStorage.removeItem("conferenteByNunota");
       localStorage.removeItem("nuconfByNunota");
       localStorage.removeItem("optimisticFinalizedByNunota");
+      // opcional:
+      // localStorage.removeItem("checkedItemsByNunota");
+      // localStorage.removeItem("qtdConferidaByNunota");
+
       if (onRefresh) onRefresh();
       alert("Cache sincronizado. Os dados serão atualizados.");
       setTimeout(() => window.location.reload(), 800);
@@ -609,6 +632,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
     }
   }
 
+  // ✅ ALTERADO: NÃO preenche mais qtd automaticamente ao marcar check
   function toggleItemChecked(nunota: number, key: string) {
     setCheckedByNunota((prev) => {
       const next: any = { ...prev };
@@ -620,6 +644,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
     });
   }
 
+  // ✅ ALTERADO: "Tudo" só marca os checks. Não preenche qtd.
   function marcarTodos(nunota: number, itens: any[], value: boolean) {
     setCheckedByNunota((prev) => {
       const next: any = { ...prev };
@@ -631,6 +656,58 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
       saveCheckedItems(next);
       return next;
     });
+  }
+
+  function setQtdConferida(nunota: number, key: string, value: number | "") {
+    setQtdByNunota((prev) => {
+      const next: QtdByNunota = { ...prev };
+      const map = { ...(next[nunota] ?? {}) };
+      map[key] = value;
+      next[nunota] = map;
+      saveQtdByNunota(next);
+      return next;
+    });
+  }
+
+  function isQtdMatch(qtdEsperada: number, digitada: number | ""): boolean {
+    if (digitada === "") return false; // ✅ se não digitou, não vale
+    const a = Number(qtdEsperada ?? 0);
+    const b = Number(digitada);
+    return Number.isFinite(a) && Number.isFinite(b) && a === b;
+  }
+
+  function pedidoChecklistOk(p: DetalhePedido): { allChecked: boolean; allQtyOk: boolean; ok: boolean; done: number; okQty: number } {
+    const mapCheck = checkedByNunota[p.nunota] ?? {};
+    const mapQtd = qtdByNunota[p.nunota] ?? {};
+    const total = p.itens.length;
+
+    let done = 0;
+    let okQty = 0;
+
+    for (let idx = 0; idx < p.itens.length; idx++) {
+      const item = p.itens[idx];
+      const k = itemKey(item, idx);
+
+      const checked = !!mapCheck[k];
+      if (checked) done++;
+
+      const qtdEsperada =
+        item.qtdConferida ??
+        item.qtdAtual ??
+        item.qtdOriginal ??
+        item.qtdEsperada ??
+        0;
+
+      const digitada = mapQtd[k] ?? ""; // ✅ se vazio, não conta
+      const match = isQtdMatch(Number(qtdEsperada) || 0, digitada);
+      if (match) okQty++;
+    }
+
+    const allChecked = total > 0 ? done === total : false;
+    const allQtyOk = total > 0 ? okQty === total : false;
+
+    // ✅ Só libera quando TUDO está marcado E TUDO tem qtd digitada batendo.
+    return { allChecked, allQtyOk, ok: allChecked && allQtyOk, done, okQty };
   }
 
   if (loadingInicial && pedidos.length === 0) return <div className="center">Carregando…</div>;
@@ -723,6 +800,8 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
           if (!p) return null;
 
           const isLoadingThis = loadingConfirmacao === p.nunota;
+          const checklist = pedidoChecklistOk(p);
+          const canConfirm = checklist.ok;
 
           return (
             <Portal>
@@ -757,6 +836,17 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                             · NF <b>{p.numNota}</b>
                           </>
                         ) : null}
+                      </div>
+
+                      {!canConfirm && (
+                        <div style={{ marginTop: 8, fontSize: 12, fontWeight: 900, color: "#b91c1c" }}>
+                          ⚠️ Para finalizar: marque TODOS os itens e DIGITE a quantidade conferida em cada item (sem auto-preencher).
+                        </div>
+                      )}
+
+                      {/* ✅ MENSAGEM PEDIDA */}
+                      <div style={{ marginTop: 8, fontSize: 12, fontWeight: 1000, color: "#1f2937", opacity: 0.9 }}>
+                        🧾 Realizar corte pelo Sankhya!
                       </div>
                     </div>
 
@@ -849,6 +939,13 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                           <span style={{ opacity: 0.8 }}>Itens</span>
                           <b>{p.itens?.length ?? 0}</b>
                         </div>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0" }}>
+                          <span style={{ opacity: 0.8 }}>Checklist</span>
+                          <b style={{ color: checklist.ok ? "#16a34a" : "#c97f2a" }}>
+                            {checklist.done}/{p.itens.length} checks · {checklist.okQty}/{p.itens.length} qtd ok
+                          </b>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -880,9 +977,10 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         const cod = Number(finalizarConferenteId || 0);
                         const found = conferentesBackend.find((c) => c.codUsuario === cod) || null;
                         if (!found) return alert("Selecione o conferente.");
+                        if (!canConfirm) return alert("Checklist incompleto: digite a quantidade conferida em todos os itens e ela precisa bater.");
                         confirmarConferenteEFinalizar(p, found);
                       }}
-                      disabled={isLoadingThis}
+                      disabled={isLoadingThis || !canConfirm || !(Number(finalizarConferenteId || 0) > 0)}
                       style={{
                         minWidth: 260,
                         display: "inline-flex",
@@ -891,6 +989,11 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         gap: 10,
                         opacity: isLoadingThis ? 0.92 : 1,
                       }}
+                      title={
+                        !canConfirm
+                          ? "Bloqueado: precisa marcar todos e digitar a quantidade conferida (sem auto-preencher)."
+                          : "Confirmar e finalizar"
+                      }
                     >
                       {isLoadingThis ? (
                         <>
@@ -1044,7 +1147,11 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                 "(não definido)";
 
               const isLoadingThis = loadingConfirmacao === p.nunota;
-              const disabledFinalizar = !podeFinalizarAgora || isFinalizadaOk || isLoadingThis;
+
+              const checklist = pedidoChecklistOk(p);
+              const bloqueioChecklist = !checklist.ok;
+
+              const disabledFinalizar = !podeFinalizarAgora || isFinalizadaOk || isLoadingThis || bloqueioChecklist;
 
               return (
                 <>
@@ -1055,6 +1162,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                       onSelect(p);
                       setExpandedNunota((cur) => (cur === p.nunota ? null : p.nunota));
                     }}
+                    title={bloqueioChecklist ? "Checklist incompleto: marque todos e digite a quantidade em cada item." : undefined}
                   >
                     <td>
                       <div style={{ fontWeight: 900 }}>
@@ -1064,6 +1172,18 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         )}
                       </div>
                       <div style={{ opacity: 0.75, fontSize: 12 }}>{p.itens.length} itens</div>
+
+                      <div style={{ marginTop: 4, fontSize: 12, fontWeight: 900, opacity: 0.85 }}>
+                        {checklist.ok ? (
+                          <span style={{ color: "#16a34a" }}>✅ Itens OK</span>
+                        ) : (
+                          <span style={{ color: "#b91c1c" }}>
+                            ⚠️ {checklist.done}/{p.itens.length} checks · {checklist.okQty}/{p.itens.length} qtd ok
+                          </span>
+                        )}
+                      </div>
+
+                      
                     </td>
 
                     <td>{p.nomeParc ?? "-"}</td>
@@ -1095,7 +1215,10 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         className={`btn-finalizar ${disabledFinalizar ? "btn-finalizar-inactive" : ""}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (disabledFinalizar) return;
+                          if (disabledFinalizar) {
+                            if (bloqueioChecklist) alert("Checklist incompleto: marque TODOS os itens e digite a quantidade conferida em cada item.");
+                            return;
+                          }
 
                           setFinalizarNunotaOpen(p.nunota);
                           const presetId = confExibicao?.codUsuario ?? "";
@@ -1103,7 +1226,9 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         }}
                         title={
                           disabledFinalizar
-                            ? "Finalizar disponível apenas em AC (Aguardando) ou A (Em andamento)"
+                            ? bloqueioChecklist
+                              ? "Bloqueado: checklist incompleto (checks + quantidade digitada)."
+                              : "Finalizar disponível apenas em AC (Aguardando) ou A (Em andamento)"
                             : "Finalizar (selecionar conferente)"
                         }
                         disabled={disabledFinalizar}
@@ -1124,10 +1249,23 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                               const map = checkedByNunota[p.nunota] ?? {};
                               const total = p.itens.length;
                               const done = p.itens.reduce((acc, it, idx) => acc + (map[itemKey(it, idx)] ? 1 : 0), 0);
+
+                              const mapQtd = qtdByNunota[p.nunota] ?? {};
+                              const okQty = p.itens.reduce((acc, it, idx) => {
+                                const qtd =
+                                  it.qtdConferida ??
+                                  it.qtdAtual ??
+                                  it.qtdOriginal ??
+                                  it.qtdEsperada ??
+                                  0;
+                                const k = itemKey(it, idx);
+                                return acc + (isQtdMatch(Number(qtd) || 0, mapQtd[k] ?? "") ? 1 : 0);
+                              }, 0);
+
                               return (
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                                   <span style={{ fontWeight: 900, opacity: 0.85 }}>
-                                    Conferidos: {done}/{total}
+                                    Conferidos: {done}/{total} · Qtd OK: {okQty}/{total}
                                   </span>
                                   <button
                                     className="chip"
@@ -1154,9 +1292,13 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                             })()}
                           </div>
 
+                          <div style={{ marginBottom: 10, fontSize: 12, fontWeight: 1000, color: "red", opacity: 0.9 }}>
+                            🧾 Realizar corte pelo Sankhya!
+                          </div>
+
                           <div className="detail-items">
                             {p.itens.map((item, idx) => {
-                              const qtd =
+                              const qtdEsperada =
                                 item.qtdConferida ??
                                 item.qtdAtual ??
                                 item.qtdOriginal ??
@@ -1166,10 +1308,16 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                               const key = itemKey(item, idx);
                               const checked = !!checkedByNunota[p.nunota]?.[key];
 
+                              const digitadaRaw = qtdByNunota[p.nunota]?.[key] ?? "";
+                              const match = isQtdMatch(Number(qtdEsperada) || 0, digitadaRaw);
+
+                              // ✅ se marcou e não digitou OU digitou errado, mostra erro
+                              const showMismatch = checked && !match;
+
                               return (
                                 <div
                                   key={`${item.codProd}-${idx}`}
-                                  className={`detail-item ${checked ? "detail-item-checked" : ""}`}
+                                  className={`detail-item ${checked ? "detail-item-checked" : ""} ${showMismatch ? "detail-item-mismatch" : ""}`}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="item-row">
@@ -1180,7 +1328,48 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                                       <div className="item-sub">Unidade: {item.unidade}</div>
 
                                       <div style={{ marginTop: 6, fontSize: 13 }}>
-                                        Quantidade: <b>{qtd}</b>
+                                        Quantidade: <b>{qtdEsperada}</b>
+                                      </div>
+
+                                      {checked && digitadaRaw === "" && (
+                                        <div style={{ marginTop: 6, fontSize: 12, fontWeight: 900, color: "#b91c1c" }}>
+                                          ⚠️ Digite a quantidade conferida
+                                        </div>
+                                      )}
+
+                                      {checked && digitadaRaw !== "" && !match && (
+                                        <div style={{ marginTop: 6, fontSize: 12, fontWeight: 900, color: "#b91c1c" }}>
+                                          ⚠️ Qtd digitada não confere
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* ✅ input de quantidade ao lado do check */}
+                                    <div className="qtd-box" onClick={(e) => e.stopPropagation()}>
+                                      <div className="qtd-label">Qtd conf.</div>
+                                      <input
+                                        className={`qtd-input ${showMismatch ? "qtd-input-error" : ""}`}
+                                        inputMode="numeric"
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        value={digitadaRaw === "" ? "" : Number(digitadaRaw)}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          if (v === "") return setQtdConferida(p.nunota, key, "");
+                                          const n = Number(v);
+                                          if (!Number.isFinite(n)) return setQtdConferida(p.nunota, key, "");
+                                          setQtdConferida(p.nunota, key, Math.max(0, Math.floor(n)));
+                                        }}
+                                        placeholder="digite"
+                                        title="Digite a quantidade conferida"
+                                      />
+                                      <div className={`qtd-hint ${match ? "qtd-hint-ok" : "qtd-hint-bad"}`}>
+                                        {digitadaRaw === ""
+                                          ? "—"
+                                          : match
+                                          ? "OK"
+                                          : `≠ ${Number(qtdEsperada) || 0}`}
                                       </div>
                                     </div>
 
@@ -1316,6 +1505,10 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
           border-color: rgba(22, 163, 74, 0.55);
           background: rgba(22, 163, 74, 0.06);
         }
+        .detail-item-mismatch{
+          border-color: rgba(185, 28, 28, 0.55);
+          background: rgba(185, 28, 28, 0.04);
+        }
 
         .item-row{
           display:flex;
@@ -1326,6 +1519,47 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
         .item-info{ flex: 1; min-width: 0; }
         .item-title{ font-weight: 900; }
         .item-sub{ opacity: .8; font-size: 12px; }
+
+        /* ✅ box do input de qtd */
+        .qtd-box{
+          flex: 0 0 auto;
+          display:flex;
+          flex-direction:column;
+          align-items:flex-end;
+          gap: 4px;
+          min-width: 92px;
+        }
+        .qtd-label{
+          font-size: 10.5px;
+          font-weight: 1000;
+          opacity: .75;
+          letter-spacing: .02em;
+        }
+        .qtd-input{
+          width: 92px;
+          height: 38px;
+          border-radius: 10px;
+          border: 2px solid rgba(0,0,0,0.14);
+          background: #fff;
+          font-weight: 1000;
+          text-align: center;
+          outline: none;
+        }
+        .qtd-input:focus{
+          border-color: rgba(59,130,246,0.7);
+          box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+        }
+        .qtd-input-error{
+          border-color: rgba(185, 28, 28, 0.75) !important;
+          box-shadow: 0 0 0 4px rgba(185, 28, 28, 0.10);
+        }
+        .qtd-hint{
+          font-size: 11px;
+          font-weight: 1000;
+          opacity: .9;
+        }
+        .qtd-hint-ok{ color: #16a34a; }
+        .qtd-hint-bad{ color: #b91c1c; }
 
         .circle-check{
           flex: 0 0 auto;
