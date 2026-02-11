@@ -844,10 +844,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         </div>
                       )}
 
-                      {/* ✅ MENSAGEM PEDIDA */}
-                      <div style={{ marginTop: 8, fontSize: 12, fontWeight: 1000, color: "#1f2937", opacity: 0.9 }}>
-                        🧾 Realizar corte pelo Sankhya!
-                      </div>
+                     
                     </div>
 
                     <button
@@ -1173,15 +1170,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                       </div>
                       <div style={{ opacity: 0.75, fontSize: 12 }}>{p.itens.length} itens</div>
 
-                      <div style={{ marginTop: 4, fontSize: 12, fontWeight: 900, opacity: 0.85 }}>
-                        {checklist.ok ? (
-                          <span style={{ color: "#16a34a" }}>✅ Itens OK</span>
-                        ) : (
-                          <span style={{ color: "#b91c1c" }}>
-                            ⚠️ {checklist.done}/{p.itens.length} checks · {checklist.okQty}/{p.itens.length} qtd ok
-                          </span>
-                        )}
-                      </div>
+                      
 
                       
                     </td>
@@ -1292,9 +1281,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                             })()}
                           </div>
 
-                          <div style={{ marginBottom: 10, fontSize: 12, fontWeight: 1000, color: "red", opacity: 0.9 }}>
-                            🧾 Realizar corte pelo Sankhya!
-                          </div>
+                        
 
                           <div className="detail-items">
                             {p.itens.map((item, idx) => {
