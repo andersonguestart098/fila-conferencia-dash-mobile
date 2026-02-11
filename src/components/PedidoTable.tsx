@@ -144,7 +144,7 @@ function itemKey(item: any, idx: number) {
   return `${cod}-${idx}`;
 }
 
-// ✅ NOVO: quantidade conferida por item (localStorage)
+// ✅ quantidade conferida por item (localStorage)
 type QtdByNunota = Record<number, Record<string, number | "">>;
 function loadQtdByNunota(): QtdByNunota {
   try {
@@ -632,7 +632,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
     }
   }
 
-  // ✅ ALTERADO: NÃO preenche mais qtd automaticamente ao marcar check
+  // ✅ mantém regra: check manual NÃO preenche qtd automaticamente
   function toggleItemChecked(nunota: number, key: string) {
     setCheckedByNunota((prev) => {
       const next: any = { ...prev };
@@ -644,8 +644,9 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
     });
   }
 
-  // ✅ ALTERADO: "Tudo" só marca os checks. Não preenche qtd.
+  // ✅ NOVO: botão "Tudo" marca checks E preenche qtd esperada automaticamente
   function marcarTodos(nunota: number, itens: any[], value: boolean) {
+    // 1) marca checks
     setCheckedByNunota((prev) => {
       const next: any = { ...prev };
       const map: Record<string, boolean> = { ...(next[nunota] ?? {}) };
@@ -654,6 +655,30 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
       });
       next[nunota] = map;
       saveCheckedItems(next);
+      return next;
+    });
+
+    // 2) preenche qtd somente quando value === true
+    setQtdByNunota((prev) => {
+      const next: QtdByNunota = { ...prev };
+      const map = { ...(next[nunota] ?? {}) };
+
+      if (value) {
+        itens.forEach((it, idx) => {
+          const k = itemKey(it, idx);
+          const qtdEsperada = it.qtdConferida ?? it.qtdAtual ?? it.qtdOriginal ?? it.qtdEsperada ?? 0;
+          map[k] = Math.max(0, Math.floor(Number(qtdEsperada) || 0));
+        });
+      } else {
+        // ao limpar tudo, limpa qtd também (mantém coerência)
+        itens.forEach((it, idx) => {
+          const k = itemKey(it, idx);
+          map[k] = "";
+        });
+      }
+
+      next[nunota] = map;
+      saveQtdByNunota(next);
       return next;
     });
   }
@@ -691,12 +716,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
       const checked = !!mapCheck[k];
       if (checked) done++;
 
-      const qtdEsperada =
-        item.qtdConferida ??
-        item.qtdAtual ??
-        item.qtdOriginal ??
-        item.qtdEsperada ??
-        0;
+      const qtdEsperada = item.qtdConferida ?? item.qtdAtual ?? item.qtdOriginal ?? item.qtdEsperada ?? 0;
 
       const digitada = mapQtd[k] ?? ""; // ✅ se vazio, não conta
       const match = isQtdMatch(Number(qtdEsperada) || 0, digitada);
@@ -713,7 +733,6 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
   if (loadingInicial && pedidos.length === 0) return <div className="center">Carregando…</div>;
   if (erro && pedidos.length === 0) return <div className="center">{erro}</div>;
 
-  // ✅ estilos inline do modal (tipado sem React.CSSProperties pra não brigar com verbatimModuleSyntax)
   const overlayStyle: CSSProperties = {
     position: "fixed",
     inset: 0,
@@ -844,7 +863,10 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         </div>
                       )}
 
-                     
+                      {/* ✅ mensagem pedida */}
+                      <div style={{ marginTop: 8, fontSize: 12, fontWeight: 1000, color: "#b91c1c" }}>
+                        REALIZAR CORTE PELO SANKHYA!
+                      </div>
                     </div>
 
                     <button
@@ -873,13 +895,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                   <div style={{ padding: "16px 18px 18px 18px" }}>
                     <div style={{ fontWeight: 900, marginBottom: 10 }}>Selecionar conferente</div>
 
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1.2fr 0.8fr",
-                        gap: 14,
-                      }}
-                    >
+                    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 14 }}>
                       <div
                         style={{
                           border: "1px solid rgba(0,0,0,0.08)",
@@ -974,7 +990,8 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         const cod = Number(finalizarConferenteId || 0);
                         const found = conferentesBackend.find((c) => c.codUsuario === cod) || null;
                         if (!found) return alert("Selecione o conferente.");
-                        if (!canConfirm) return alert("Checklist incompleto: digite a quantidade conferida em todos os itens e ela precisa bater.");
+                        if (!canConfirm)
+                          return alert("Checklist incompleto: digite a quantidade conferida em todos os itens e ela precisa bater.");
                         confirmarConferenteEFinalizar(p, found);
                       }}
                       disabled={isLoadingThis || !canConfirm || !(Number(finalizarConferenteId || 0) > 0)}
@@ -1169,10 +1186,6 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         )}
                       </div>
                       <div style={{ opacity: 0.75, fontSize: 12 }}>{p.itens.length} itens</div>
-
-                      
-
-                      
                     </td>
 
                     <td>{p.nomeParc ?? "-"}</td>
@@ -1205,7 +1218,8 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                         onClick={(e) => {
                           e.stopPropagation();
                           if (disabledFinalizar) {
-                            if (bloqueioChecklist) alert("Checklist incompleto: marque TODOS os itens e digite a quantidade conferida em cada item.");
+                            if (bloqueioChecklist)
+                              alert("Checklist incompleto: marque TODOS os itens e digite a quantidade conferida em cada item.");
                             return;
                           }
 
@@ -1241,12 +1255,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
 
                               const mapQtd = qtdByNunota[p.nunota] ?? {};
                               const okQty = p.itens.reduce((acc, it, idx) => {
-                                const qtd =
-                                  it.qtdConferida ??
-                                  it.qtdAtual ??
-                                  it.qtdOriginal ??
-                                  it.qtdEsperada ??
-                                  0;
+                                const qtd = it.qtdConferida ?? it.qtdAtual ?? it.qtdOriginal ?? it.qtdEsperada ?? 0;
                                 const k = itemKey(it, idx);
                                 return acc + (isQtdMatch(Number(qtd) || 0, mapQtd[k] ?? "") ? 1 : 0);
                               }, 0);
@@ -1262,7 +1271,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                                       e.stopPropagation();
                                       marcarTodos(p.nunota, p.itens, true);
                                     }}
-                                    title="Marcar todos"
+                                    title="Marcar todos (preenche qtd automaticamente)"
                                   >
                                     ✅ Tudo
                                   </button>
@@ -1272,7 +1281,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                                       e.stopPropagation();
                                       marcarTodos(p.nunota, p.itens, false);
                                     }}
-                                    title="Desmarcar todos"
+                                    title="Desmarcar todos (limpa qtd)"
                                   >
                                     ↩️ Limpar
                                   </button>
@@ -1281,16 +1290,9 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                             })()}
                           </div>
 
-                        
-
                           <div className="detail-items">
                             {p.itens.map((item, idx) => {
-                              const qtdEsperada =
-                                item.qtdConferida ??
-                                item.qtdAtual ??
-                                item.qtdOriginal ??
-                                item.qtdEsperada ??
-                                0;
+                              const qtdEsperada = item.qtdConferida ?? item.qtdAtual ?? item.qtdOriginal ?? item.qtdEsperada ?? 0;
 
                               const key = itemKey(item, idx);
                               const checked = !!checkedByNunota[p.nunota]?.[key];
@@ -1298,7 +1300,6 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                               const digitadaRaw = qtdByNunota[p.nunota]?.[key] ?? "";
                               const match = isQtdMatch(Number(qtdEsperada) || 0, digitadaRaw);
 
-                              // ✅ se marcou e não digitou OU digitou errado, mostra erro
                               const showMismatch = checked && !match;
 
                               return (
@@ -1331,7 +1332,6 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                                       )}
                                     </div>
 
-                                    {/* ✅ input de quantidade ao lado do check */}
                                     <div className="qtd-box" onClick={(e) => e.stopPropagation()}>
                                       <div className="qtd-label">Qtd conf.</div>
                                       <input
@@ -1352,11 +1352,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                                         title="Digite a quantidade conferida"
                                       />
                                       <div className={`qtd-hint ${match ? "qtd-hint-ok" : "qtd-hint-bad"}`}>
-                                        {digitadaRaw === ""
-                                          ? "—"
-                                          : match
-                                          ? "OK"
-                                          : `≠ ${Number(qtdEsperada) || 0}`}
+                                        {digitadaRaw === "" ? "—" : match ? "OK" : `≠ ${Number(qtdEsperada) || 0}`}
                                       </div>
                                     </div>
 
@@ -1375,9 +1371,7 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                             })}
                           </div>
 
-                          <div style={{ opacity: 0.75, marginTop: 10, fontSize: 12 }}>
-                            Checklist local (fica salvo neste PC)
-                          </div>
+                          <div style={{ opacity: 0.75, marginTop: 10, fontSize: 12 }}>Checklist local (fica salvo neste PC)</div>
                         </div>
                       </td>
                     </tr>
@@ -1507,7 +1501,6 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
         .item-title{ font-weight: 900; }
         .item-sub{ opacity: .8; font-size: 12px; }
 
-        /* ✅ box do input de qtd */
         .qtd-box{
           flex: 0 0 auto;
           display:flex;
@@ -1584,7 +1577,6 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
           100% { box-shadow: inset 0 0 0 rgba(255,0,0,0); }
         }
 
-        /* ✅ modal sucesso */
         .modal-overlay{
           position: fixed;
           inset: 0;
@@ -1645,7 +1637,6 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
           margin-top: 12px;
         }
 
-        /* animação usada pelo spinner inline */
         @keyframes spin{
           to { transform: rotate(360deg); }
         }
