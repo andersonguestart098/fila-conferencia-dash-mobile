@@ -58,6 +58,7 @@ const CONFERENTES: Conferente[] = [
   { codUsuario: 7, nome: "Eduardo" },
   { codUsuario: 8, nome: "Everton" },
   { codUsuario: 9, nome: "Maximiliano" },
+  { codUsuario: 10, nome: "Miqueias" },
 ];
 
 function normalizeStatus(status: any): string {
