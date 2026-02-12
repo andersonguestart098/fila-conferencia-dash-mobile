@@ -53,11 +53,8 @@ const VENDEDORES: string[] = [
 type Conferente = { codUsuario: number; nome: string };
 const CONFERENTES: Conferente[] = [
   { codUsuario: 1, nome: "Manoel" },
-  { codUsuario: 2, nome: "Anderson" },
-  { codUsuario: 3, nome: "Felipe" },
   { codUsuario: 4, nome: "Matheus" },
   { codUsuario: 5, nome: "Cristiano" },
-  { codUsuario: 6, nome: "Cristiano Sanhudo" },
   { codUsuario: 7, nome: "Eduardo" },
   { codUsuario: 8, nome: "Everton" },
   { codUsuario: 9, nome: "Maximiliano" },
