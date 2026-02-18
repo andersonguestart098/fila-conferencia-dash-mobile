@@ -665,7 +665,17 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
         itens.forEach((it, idx) => {
           const k = itemKey(it, idx);
           const qtdEsperada = it.qtdConferida ?? it.qtdAtual ?? it.qtdOriginal ?? it.qtdEsperada ?? 0;
-          map[k] = Math.max(0, Math.floor(Number(qtdEsperada) || 0));
+          {
+          const raw = Number(qtdEsperada) || 0;
+          const cleaned = Math.max(0, raw);
+
+          // ✅ CODPROD 15 (bucha): permite quantidade fracionada (mileiro/cento)
+          if (Number(it.codProd) === 15) {
+            map[k] = Math.round(cleaned * 1000) / 1000;
+          } else {
+            map[k] = Math.max(0, Math.floor(cleaned));
+          }
+        }
         });
       } else {
         // ao limpar tudo, limpa qtd também (mantém coerência)
@@ -696,7 +706,11 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
     if (digitada === "") return false; // ✅ se não digitou, não vale
     const a = Number(qtdEsperada ?? 0);
     const b = Number(digitada);
-    return Number.isFinite(a) && Number.isFinite(b) && a === b;
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+
+    // ✅ tolerância pra evitar falso mismatch de float
+    const EPS = 1e-6;
+    return Math.abs(a - b) < EPS;
   }
 
   function pedidoChecklistOk(p: DetalhePedido): { allChecked: boolean; allQtyOk: boolean; ok: boolean; done: number; okQty: number } {
@@ -1292,6 +1306,9 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                             {p.itens.map((item, idx) => {
                               const qtdEsperada = item.qtdConferida ?? item.qtdAtual ?? item.qtdOriginal ?? item.qtdEsperada ?? 0;
 
+                              // ✅ CODPROD 15 (bucha): vende em mileiro/cento, aceita quantidade fracionada
+                              const aceitaDecimal = Number(item.codProd) === 15;
+
                               const key = itemKey(item, idx);
                               const checked = !!checkedByNunota[p.nunota]?.[key];
 
@@ -1334,17 +1351,30 @@ export function PedidoTable({ pedidos, loadingInicial, erro, onSelect, onRefresh
                                       <div className="qtd-label">Qtd conf.</div>
                                       <input
                                         className={`qtd-input ${showMismatch ? "qtd-input-error" : ""}`}
-                                        inputMode="numeric"
+                                        inputMode={aceitaDecimal ? "decimal" : "numeric"}
                                         type="number"
                                         min={0}
-                                        step={1}
+                                        step={aceitaDecimal ? 0.001 : 1}
                                         value={digitadaRaw === "" ? "" : Number(digitadaRaw)}
                                         onChange={(e) => {
                                           const v = e.target.value;
+
+                                          // vazio → limpa
                                           if (v === "") return setQtdConferida(p.nunota, key, "");
+
                                           const n = Number(v);
                                           if (!Number.isFinite(n)) return setQtdConferida(p.nunota, key, "");
-                                          setQtdConferida(p.nunota, key, Math.max(0, Math.floor(n)));
+
+                                          const cleaned = Math.max(0, n);
+
+                                          // ✅ se aceita decimal, guarda até 3 casas
+                                          if (aceitaDecimal) {
+                                            const rounded = Math.round(cleaned * 1000) / 1000;
+                                            return setQtdConferida(p.nunota, key, rounded);
+                                          }
+
+                                          // ✅ padrão: inteiro
+                                          setQtdConferida(p.nunota, key, Math.max(0, Math.floor(cleaned)));
                                         }}
                                         placeholder="digite"
                                         title="Digite a quantidade conferida"
