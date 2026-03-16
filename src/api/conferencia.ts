@@ -2,14 +2,6 @@
 import { api } from "./client";
 import type { DetalhePedido } from "../types/conferencia";
 
-// Interface para a nova resposta do backend
-interface PedidosResponse {
-  pedidos: DetalhePedido[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
 // controller compartilhado só pra essa rota
 let pendentesController: AbortController | null = null;
 
