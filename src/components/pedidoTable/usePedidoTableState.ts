@@ -6,7 +6,6 @@ import {
   loadNuconfByNunota,
   loadOptimisticFinalized,
   loadQtdByNunota,
-  loadTimers,
   saveCheckedItems,
   saveQtdByNunota,
   type CheckedItemsByNunota,
@@ -14,7 +13,6 @@ import {
   type NuconfByNunota,
   type OptimisticFinalizedByNunota,
   type QtdByNunota,
-  type TimerMap,
 } from "./storage";
 import { getQtdEsperadaItem, itemKey, normalizeStatus } from "./helpers";
 import { ITENS_POR_PAGINA } from "./constants";
@@ -27,7 +25,6 @@ export function usePedidoTableState(pedidos: DetalhePedido[]) {
   const [filtrosOpen, setFiltrosOpen] = useState(false);
   const [somAlertaDesativado, setSomAlertaDesativado] = useState(false);
 
-  const [timerByNunota] = useState<TimerMap>(() => loadTimers());
   const [conferenteByNunota, setConferenteByNunota] = useState<ConferenteByNunota>(() => loadConferenteByNunota());
   const [nuconfByNunota, setNuconfByNunota] = useState<NuconfByNunota>(() => loadNuconfByNunota());
   const [optimisticFinalizedByNunota, setOptimisticFinalizedByNunota] =

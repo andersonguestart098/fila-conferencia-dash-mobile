@@ -1,4 +1,3 @@
-import React from "react";
 import type { DetalhePedido } from "../../types/conferencia";
 import { formatElapsed } from "./helpers";
 
