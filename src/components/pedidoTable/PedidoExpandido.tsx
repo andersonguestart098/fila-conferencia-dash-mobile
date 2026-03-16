@@ -29,6 +29,7 @@ export function PedidoExpandido({
 }: PedidoExpandidoProps) {
   const map = checkedByNunota[pedido.nunota] ?? {};
   const mapQtd = qtdByNunota[pedido.nunota] ?? {};
+  
 
   const total = pedido.itens.length;
   const done = pedido.itens.reduce((acc, it, idx) => acc + (map[itemKey(it, idx)] ? 1 : 0), 0);
@@ -85,6 +86,8 @@ export function PedidoExpandido({
               const estoqueBruto = Number(item.estoqueBruto ?? 0);
               const estoqueDisponivel = Number(item.estoqueDisponivel ?? 0);
 
+              const corEstoqueDisponivel = estoqueDisponivel < 0 ? "#ea580c" : "#1e3a8a";
+
               const grupoLiberado = isGrupoConstrucaoSeco(item.codGrupoProd);
               const aceitaDecimal = aceitaDecimalPorProduto(item.codProd);
 
@@ -132,9 +135,16 @@ export function PedidoExpandido({
                         </b>
                       </div>
 
-                      <div style={{ marginTop: 2, fontSize: 13 }}>
+                     <div style={{ marginTop: 2, fontSize: 13 }}>
                         Estoque Disponível:{" "}
-                        <b>{estoqueDisponivel}</b>
+                        <b
+                          style={{
+                            color: corEstoqueDisponivel,
+                            fontWeight: 900,
+                          }}
+                        >
+                          {estoqueDisponivel}
+                        </b>
                       </div>
 
                       {showEstoqueError && (
