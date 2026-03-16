@@ -2,6 +2,14 @@
 import { api } from "./client";
 import type { DetalhePedido } from "../types/conferencia";
 
+// Interface para a nova resposta do backend
+interface PedidosResponse {
+  pedidos: DetalhePedido[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 // controller compartilhado só pra essa rota
 let pendentesController: AbortController | null = null;
 
@@ -111,7 +119,7 @@ export async function buscarPedidosPendentes(): Promise<DetalhePedido[] | null> 
     console.log("📡 [API] Buscando pedidos pendentes...");
 
     // timeout só pra esse endpoint (se quiser manter 30s global)
-    const data = await getComRetry<DetalhePedido[]>(
+    const data = await getComRetry<any>(
       url,
       {
         signal: pendentesController.signal,
@@ -126,23 +134,30 @@ export async function buscarPedidosPendentes(): Promise<DetalhePedido[] | null> 
       return [];
     }
 
-    if (Array.isArray(data)) {
-      console.log("✅ [API] Dados recebidos do backend:", {
-        total: data.length,
-        primeiroPedido: data[0] ? {
-          nunota: data[0].nunota,
-          conferenteId: (data[0] as any).conferenteId,
-          conferenteNome: (data[0] as any).conferenteNome,
-          nomeConferente: data[0].nomeConferente
+    // ✅ NOVO FORMATO: objeto com pedidos, total, page, pageSize
+    if (data.pedidos && Array.isArray(data.pedidos)) {
+      console.log("✅ [API] Dados recebidos do backend (novo formato):", {
+        total: data.total,
+        page: data.page,
+        pageSize: data.pageSize,
+        primeiroPedido: data.pedidos[0] ? {
+          nunota: data.pedidos[0].nunota,
+          itens: data.pedidos[0].itens?.length,
+          primeiroItemEstoque: data.pedidos[0].itens?.[0]?.estoqueDisponivel,
+          conferenteId: (data.pedidos[0] as any).conferenteId,
+          conferenteNome: (data.pedidos[0] as any).conferenteNome,
+          nomeConferente: data.pedidos[0].nomeConferente
         } : null
       });
+
+      const pedidos = data.pedidos as DetalhePedido[];
 
       // ✅ Sincroniza conferentes locais com dados do backend
       const conferenteByNunota = loadConferenteByNunota();
       const updatedConferenteByNunota = { ...conferenteByNunota };
       let atualizados = 0;
       
-      data.forEach(pedido => {
+      pedidos.forEach((pedido: DetalhePedido) => {  // ✅ TIPADO COMO DetalhePedido
         const idBackend = (pedido as any).conferenteId;
         const nomeBackend = (pedido as any).conferenteNome;
         const nomeConferenteOld = pedido.nomeConferente;
@@ -193,10 +208,80 @@ export async function buscarPedidosPendentes(): Promise<DetalhePedido[] | null> 
         console.log(`🔄 [API] ${atualizados} conferentes sincronizados com localStorage`);
       }
       
-      return data;
+      return pedidos;
     }
 
-    console.warn("⚠ [API] Resposta inesperada (data não é array), retornando lista vazia");
+    // ✅ FORMATO ANTIGO: lista direta
+    if (Array.isArray(data)) {
+      console.log("✅ [API] Dados recebidos do backend (formato antigo):", {
+        total: data.length,
+        primeiroPedido: data[0] ? {
+          nunota: data[0].nunota,
+          itens: data[0].itens?.length,
+          primeiroItemEstoque: data[0].itens?.[0]?.estoqueDisponivel,
+          conferenteId: (data[0] as any).conferenteId,
+          conferenteNome: (data[0] as any).conferenteNome,
+          nomeConferente: data[0].nomeConferente
+        } : null
+      });
+
+      const pedidos = data as DetalhePedido[];
+
+      // ✅ Sincroniza conferentes locais com dados do backend
+      const conferenteByNunota = loadConferenteByNunota();
+      const updatedConferenteByNunota = { ...conferenteByNunota };
+      let atualizados = 0;
+      
+      pedidos.forEach((pedido: DetalhePedido) => {  // ✅ TIPADO COMO DetalhePedido
+        const idBackend = (pedido as any).conferenteId;
+        const nomeBackend = (pedido as any).conferenteNome;
+        const nomeConferenteOld = pedido.nomeConferente;
+        
+        if (idBackend && nomeBackend) {
+          updatedConferenteByNunota[pedido.nunota] = {
+            codUsuario: idBackend,
+            nome: nomeBackend
+          };
+          atualizados++;
+          console.log(`✅ [API] Conferente atualizado do backend: ${pedido.nunota} -> ${nomeBackend}`);
+        } 
+        else if (nomeConferenteOld && nomeConferenteOld !== "null" && nomeConferenteOld !== "-" && nomeConferenteOld !== "") {
+          const conferenteEncontrado = [
+            { codUsuario: 1, nome: "Manoel" },
+            { codUsuario: 2, nome: "Anderson" },
+            { codUsuario: 3, nome: "Felipe" },
+            { codUsuario: 4, nome: "Matheus" },
+            { codUsuario: 5, nome: "Cristiano" },
+            { codUsuario: 6, nome: "Cristiano Sanhudo" },
+            { codUsuario: 7, nome: "Eduardo" },
+            { codUsuario: 8, nome: "Everton" },
+            { codUsuario: 9, nome: "Maximiliano" },
+          ].find(c => c.nome.toLowerCase() === nomeConferenteOld.toLowerCase());
+          
+          if (conferenteEncontrado) {
+            updatedConferenteByNunota[pedido.nunota] = conferenteEncontrado;
+            atualizados++;
+            console.log(`✅ [API] Conferente encontrado pelo nome: ${pedido.nunota} -> ${nomeConferenteOld}`);
+          } else if (!conferenteByNunota[pedido.nunota]) {
+            updatedConferenteByNunota[pedido.nunota] = {
+              codUsuario: 0,
+              nome: nomeConferenteOld
+            };
+            atualizados++;
+            console.log(`✅ [API] Conferente criado temporariamente: ${pedido.nunota} -> ${nomeConferenteOld}`);
+          }
+        }
+      });
+      
+      if (atualizados > 0) {
+        saveConferenteByNunota(updatedConferenteByNunota);
+        console.log(`🔄 [API] ${atualizados} conferentes sincronizados com localStorage`);
+      }
+      
+      return pedidos;
+    }
+
+    console.warn("⚠ [API] Resposta inesperada, retornando lista vazia", data);
     return [];
   } catch (error: any) {
     const isCanceled =

@@ -3,6 +3,7 @@
 export interface ItemConferencia {
   sequencia: number;
   codProd: number;
+  codGrupoProd?: number | null;
   descricao: string;
   unidade: string;
 
@@ -13,9 +14,10 @@ export interface ItemConferencia {
   qtdAtual?: number | null;
   
   // Campos adicionais que podem vir do backend
-  qtdNeg?: number; // ✅ Adicionado para compatibilidade
-  vlrUnit?: number;
-  vlrTot?: number;
+  qtdNeg?: number;
+  vlrUnit?: number | null;
+  vlrTot?: number | null;
+  estoqueDisponivel?: number | null;
 }
 
 export interface DetalhePedido {
@@ -23,17 +25,14 @@ export interface DetalhePedido {
   numNota?: number | null;
   nuconf?: number | null;
 
-  statusConferencia: string; // "AC", "A", "R", etc.
+  statusConferencia: string;
 
   nomeParc?: string | null;
   nomeVendedor?: string | null;
   
+  conferenteId?: number | null;
+  conferenteNome?: string | null;
   
-  // ✅ Campos para o conferente
-  conferenteId?: number | null;       // Código do conferente (salvo pelo app mobile)
-  conferenteNome?: string | null;     // Nome do conferente (salvo pelo app mobile)
-  
-  // ✅ Campo antigo para compatibilidade (mantido)
   nomeConferente?: string | null;
   
   avatarUrlConferente?: string | null;
@@ -41,23 +40,19 @@ export interface DetalhePedido {
   itens: ItemConferencia[];
 }
 
-// ✅ Tipo para Conferente (usado no componente)
 export type Conferente = {
   codUsuario: number;
   nome: string;
 };
 
-// ✅ Interface para resposta da criação de conferência
 export interface ConferenciaCriada {
   nuconf: number;
   nunotaOrig: number;
 }
 
-// ✅ Interface para itens de conferência na UI
 export interface ItemConferenciaUI extends ItemConferencia {
   qtdConferida: number;
   conferido: boolean;
 }
 
-// ✅ Tipo para Pedido (alias para compatibilidade)
 export type Pedido = DetalhePedido;

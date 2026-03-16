@@ -3,7 +3,7 @@ import axios from "axios";
 
 export const api = axios.create({
   baseURL: "https://api-sankhya-fila-conferencia-6bbe82fb50b8.herokuapp.com",
-  timeout: 60000, // 60s global (ou deixe 30s e ajuste por request)
+  timeout: 60000,
 });
 
 // Marca tempo de início p/ medir duração
