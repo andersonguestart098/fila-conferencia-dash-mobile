@@ -7,16 +7,16 @@ export interface ItemConferencia {
   descricao: string;
   unidade: string;
 
-  // Quantidades (podem vir nulas do backend)
   qtdEsperada?: number | null;
   qtdConferida?: number | null;
   qtdOriginal?: number | null;
   qtdAtual?: number | null;
-  
-  // Campos adicionais que podem vir do backend
+
   qtdNeg?: number;
   vlrUnit?: number | null;
   vlrTot?: number | null;
+
+  estoqueBruto?: number | null;
   estoqueDisponivel?: number | null;
 }
 

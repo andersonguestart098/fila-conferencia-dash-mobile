@@ -59,10 +59,10 @@ export function verificarEstoqueSuficiente(item: ItemConferencia): boolean {
     return true;
   }
 
-  const estoqueDisponivel = Number(item.estoqueDisponivel ?? 0);
+  const estoqueBruto = Number(item.estoqueBruto ?? 0);
   const qtdNecessaria = getQtdPedidoItem(item);
 
-  return estoqueDisponivel > 0 && estoqueDisponivel >= qtdNecessaria;
+  return estoqueBruto > 0 && estoqueBruto >= qtdNecessaria;
 }
 
 export type CheckedItemsByNunota = Record<number, Record<string, boolean>>;
