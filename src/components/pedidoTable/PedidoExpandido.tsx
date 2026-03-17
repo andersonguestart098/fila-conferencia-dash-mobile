@@ -1,6 +1,7 @@
 import type { DetalhePedido } from "../../types/conferencia";
 import {
   aceitaDecimalPorProduto,
+  getEstoqueDisponivelAjustado,
   getQtdEsperadaItem,
   getQtdPedidoItem,
   isGrupoConstrucaoSeco,
@@ -39,7 +40,11 @@ export function PedidoExpandido({
     return acc + (isQtdMatch(qtd, mapQtd[k] ?? "") ? 1 : 0);
   }, 0);
 
-  const estoqueOk = pedido.itens.reduce((acc, it) => acc + (verificarEstoqueSuficiente(it) ? 1 : 0), 0);
+  const estoqueOk = pedido.itens.reduce((acc, it) => {
+    const grupoLiberado = isGrupoConstrucaoSeco((it as any).codGrupoProd);
+    if (grupoLiberado) return acc + 1;
+    return acc + (verificarEstoqueSuficiente(it) ? 1 : 0);
+  }, 0);
 
   return (
     <tr className="row-detail">
@@ -82,12 +87,11 @@ export function PedidoExpandido({
               const qtdEsperada = getQtdEsperadaItem(item);
               const qtdNeg = getQtdPedidoItem(item);
 
-              const estoqueBruto = Number(item.estoqueBruto ?? 0);
-              const estoqueDisponivel = Number(item.estoqueDisponivel ?? 0);
-              const estoqueDisponivelAjustado = estoqueDisponivel + qtdNeg;
+              const estoqueBruto = Number((item as any).estoqueBruto ?? 0);
+              const estoqueDisponivelAjustado = getEstoqueDisponivelAjustado(item);
 
-              const grupoLiberado = isGrupoConstrucaoSeco(item.codGrupoProd);
-              const aceitaDecimal = aceitaDecimalPorProduto(item.codProd);
+              const grupoLiberado = isGrupoConstrucaoSeco((item as any).codGrupoProd);
+              const aceitaDecimal = aceitaDecimalPorProduto((item as any).codProd);
 
               const key = itemKey(item, idx);
               const checked = !!checkedByNunota[pedido.nunota]?.[key];
@@ -97,27 +101,28 @@ export function PedidoExpandido({
 
               const estoqueInsuficiente = !verificarEstoqueSuficiente(item);
 
-              const corEstoqueDisponivel = estoqueDisponivelAjustado < qtdNeg || estoqueDisponivelAjustado < 0
-                ? "#b91c1c"
-                : "#16a34a";
+              const corEstoqueDisponivel =
+                grupoLiberado || (estoqueDisponivelAjustado >= qtdNeg && estoqueDisponivelAjustado >= 0)
+                  ? "#16a34a"
+                  : "#b91c1c";
 
               const showMismatch = checked && !match;
               const showEstoqueError = estoqueInsuficiente && !grupoLiberado;
 
               return (
                 <div
-                  key={`${item.codProd}-${idx}`}
+                  key={`${(item as any).codProd}-${idx}`}
                   className={`detail-item ${checked ? "detail-item-checked" : ""} ${showMismatch ? "detail-item-mismatch" : ""} ${showEstoqueError ? "detail-item-estoque-error" : ""}`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="item-row">
                     <div className="item-info">
                       <div className="item-title">
-                        {item.codProd} · {item.descricao}
+                        {(item as any).codProd} · {(item as any).descricao}
                       </div>
 
                       <div className="item-sub">
-                        Unidade: {item.unidade} · Grupo: <b>{item.codGrupoProd ?? "-"}</b>
+                        Unidade: {(item as any).unidade} · Grupo: <b>{(item as any).codGrupoProd ?? "-"}</b>
                         {grupoLiberado && (
                           <span style={{ marginLeft: 8, color: "#16a34a", fontWeight: 900 }}>
                             Regra grupo 10

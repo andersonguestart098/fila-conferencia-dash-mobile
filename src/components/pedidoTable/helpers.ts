@@ -49,19 +49,14 @@ export function getQtdPedidoItem(item: ItemConferencia): number {
   return Number(item.qtdNeg ?? getQtdEsperadaItem(item)) || 0;
 }
 
-/**
- * Nova regra:
- * - grupo começando com 10 => ignora validação de estoque
- * - demais grupos => exige estoque suficiente
- */
-export function getEstoqueDisponivelAjustado(item: any): number {
-  const qtdNeg = Number(item.qtdNeg ?? item.QTDNEG ?? 0);
-  const estoqueDisponivel = Number(item.estoqueDisponivel ?? 0);
+export function getEstoqueDisponivelAjustado(item: ItemConferencia): number {
+  const qtdNeg = getQtdPedidoItem(item);
+  const estoqueDisponivel = Number((item as any).estoqueDisponivel ?? 0);
   return estoqueDisponivel + qtdNeg;
 }
 
-export function verificarEstoqueSuficiente(item: any): boolean {
-  const qtdNeg = Number(item.qtdNeg ?? item.QTDNEG ?? 0);
+export function verificarEstoqueSuficiente(item: ItemConferencia): boolean {
+  const qtdNeg = getQtdPedidoItem(item);
   const estoqueDisponivelAjustado = getEstoqueDisponivelAjustado(item);
 
   return estoqueDisponivelAjustado >= qtdNeg && estoqueDisponivelAjustado >= 0;
@@ -105,7 +100,9 @@ export function pedidoChecklistOk(
       okQty++;
     }
 
-    if (verificarEstoqueSuficiente(item)) {
+    const grupoLiberado = isGrupoConstrucaoSeco((item as any).codGrupoProd);
+
+    if (grupoLiberado || verificarEstoqueSuficiente(item)) {
       estoqueOk++;
     }
   }
