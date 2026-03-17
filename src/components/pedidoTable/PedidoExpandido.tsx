@@ -29,7 +29,6 @@ export function PedidoExpandido({
 }: PedidoExpandidoProps) {
   const map = checkedByNunota[pedido.nunota] ?? {};
   const mapQtd = qtdByNunota[pedido.nunota] ?? {};
-  
 
   const total = pedido.itens.length;
   const done = pedido.itens.reduce((acc, it, idx) => acc + (map[itemKey(it, idx)] ? 1 : 0), 0);
@@ -85,8 +84,7 @@ export function PedidoExpandido({
 
               const estoqueBruto = Number(item.estoqueBruto ?? 0);
               const estoqueDisponivel = Number(item.estoqueDisponivel ?? 0);
-
-              const corEstoqueDisponivel = estoqueDisponivel < 0 ? "#ea580c" : "#1e3a8a";
+              const estoqueDisponivelAjustado = estoqueDisponivel + qtdNeg;
 
               const grupoLiberado = isGrupoConstrucaoSeco(item.codGrupoProd);
               const aceitaDecimal = aceitaDecimalPorProduto(item.codProd);
@@ -97,8 +95,11 @@ export function PedidoExpandido({
               const digitadaRaw = qtdByNunota[pedido.nunota]?.[key] ?? "";
               const match = isQtdMatch(qtdEsperada, digitadaRaw);
 
-              // ✅ A regra agora considera o helper, que deve usar estoqueBruto
               const estoqueInsuficiente = !verificarEstoqueSuficiente(item);
+
+              const corEstoqueDisponivel = estoqueDisponivelAjustado < qtdNeg || estoqueDisponivelAjustado < 0
+                ? "#b91c1c"
+                : "#16a34a";
 
               const showMismatch = checked && !match;
               const showEstoqueError = estoqueInsuficiente && !grupoLiberado;
@@ -135,7 +136,7 @@ export function PedidoExpandido({
                         </b>
                       </div>
 
-                     <div style={{ marginTop: 2, fontSize: 13 }}>
+                      <div style={{ marginTop: 2, fontSize: 13 }}>
                         Estoque Disponível:{" "}
                         <b
                           style={{
@@ -143,19 +144,19 @@ export function PedidoExpandido({
                             fontWeight: 900,
                           }}
                         >
-                          {estoqueDisponivel}
+                          {estoqueDisponivelAjustado}
                         </b>
                       </div>
 
                       {showEstoqueError && (
                         <div style={{ marginTop: 6, fontSize: 12, fontWeight: 900, color: "#b91c1c" }}>
-                          ⚠️ Estoque bruto insuficiente! ({estoqueBruto} bruto, {qtdNeg} necessário)
+                          ⚠️ Estoque disponível insuficiente! ({estoqueDisponivelAjustado} disponível, {qtdNeg} necessário)
                         </div>
                       )}
 
-                      {grupoLiberado && estoqueBruto < qtdNeg && (
+                      {grupoLiberado && estoqueDisponivelAjustado < qtdNeg && (
                         <div style={{ marginTop: 6, fontSize: 12, fontWeight: 900, color: "#16a34a" }}>
-                          ✅ Grupo de giro: permitido finalizar mesmo com estoque bruto insuficiente
+                          ✅ Grupo de giro: permitido finalizar mesmo com estoque insuficiente
                         </div>
                       )}
 

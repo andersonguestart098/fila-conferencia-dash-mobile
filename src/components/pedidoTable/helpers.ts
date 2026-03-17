@@ -54,15 +54,17 @@ export function getQtdPedidoItem(item: ItemConferencia): number {
  * - grupo começando com 10 => ignora validação de estoque
  * - demais grupos => exige estoque suficiente
  */
-export function verificarEstoqueSuficiente(item: ItemConferencia): boolean {
-  if (isGrupoConstrucaoSeco(item.codGrupoProd)) {
-    return true;
-  }
+export function getEstoqueDisponivelAjustado(item: any): number {
+  const qtdNeg = Number(item.qtdNeg ?? item.QTDNEG ?? 0);
+  const estoqueDisponivel = Number(item.estoqueDisponivel ?? 0);
+  return estoqueDisponivel + qtdNeg;
+}
 
-  const estoqueBruto = Number(item.estoqueBruto ?? 0);
-  const qtdNecessaria = getQtdPedidoItem(item);
+export function verificarEstoqueSuficiente(item: any): boolean {
+  const qtdNeg = Number(item.qtdNeg ?? item.QTDNEG ?? 0);
+  const estoqueDisponivelAjustado = getEstoqueDisponivelAjustado(item);
 
-  return estoqueBruto > 0 && estoqueBruto >= qtdNecessaria;
+  return estoqueDisponivelAjustado >= qtdNeg && estoqueDisponivelAjustado >= 0;
 }
 
 export type CheckedItemsByNunota = Record<number, Record<string, boolean>>;
