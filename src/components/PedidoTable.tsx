@@ -219,12 +219,37 @@ export function PedidoTable({
           setFinalizarNunotaOpen(null);
           setFinalizarConferenteId("");
         }}
-        onConfirm={(conf) => {
+        onConfirm={async (conf) => {
           if (!pedidoModal) return;
-          confirmarConferenteEFinalizar(pedidoModal, conf).then(() => {
+
+          if (!conf || !conf.codUsuario || conf.codUsuario <= 0) {
+            alert("Selecione um conferente antes de finalizar.");
+            return;
+          }
+
+          try {
+            await confirmarConferenteEFinalizar(pedidoModal, conf);
             setFinalizarNunotaOpen(null);
             setFinalizarConferenteId("");
-          });
+          } catch (error: any) {
+            console.error("Erro ao confirmar/finalizar conferência:", error);
+
+            const status = error?.response?.status;
+            const mensagem =
+              error?.response?.data?.message ||
+              error?.response?.data?.mensagem ||
+              error?.response?.data?.error ||
+              error?.message ||
+              "Não foi possível finalizar a conferência.";
+
+            if (status === 409) {
+              alert(mensagem || "Este pedido já foi finalizado por outro usuário.");
+              if (onRefresh) onRefresh();
+              return;
+            }
+
+            alert(mensagem);
+          }
         }}
       />
 
@@ -267,14 +292,26 @@ export function PedidoTable({
               const timer = timerByNunota[p.nunota] ?? { startAt: null, elapsedMs: 0, running: false };
 
               const now = Date.now();
+              const tempoBackendMs = Number((p as any).tempoConferenciaMs ?? 0);
+
               const liveElapsedMs =
-                timer.running && timer.startAt
-                  ? timer.elapsedMs + (now - timer.startAt)
-                  : timer.elapsedMs;
+                visual.isFinalOk && tempoBackendMs > 0
+                  ? tempoBackendMs
+                  : timer.running && timer.startAt
+                    ? timer.elapsedMs + (now - timer.startAt)
+                    : timer.elapsedMs;
 
               const elapsedMin = Math.floor(liveElapsedMs / 60000);
               const alerta5min =
                 statusCode === "AC" && elapsedMin >= 5 && !isOptimisticFinal(p.nunota);
+
+                console.log("DEBUG_TEMPO_PEDIDO", {
+                  nunota: p.nunota,
+                  statusConferencia: p.statusConferencia,
+                  tempoConferenciaMs: p.tempoConferenciaMs,
+                  visualIsFinalOk: visual.isFinalOk,
+                  timerLocal: timerByNunota[p.nunota],
+                });
 
               const confExibicao = getConferenteExibicao(p);
 
@@ -290,7 +327,10 @@ export function PedidoTable({
               const bloqueioChecklist = !checklist.ok;
 
               const disabledFinalizar =
-                !podeFinalizarAgora || visual.isFinalOk || isLoadingThis || bloqueioChecklist;
+              !podeFinalizarAgora ||
+              visual.isFinalOk ||
+              isLoadingThis ||
+              bloqueioChecklist;
 
               return (
                 <React.Fragment key={p.nunota}>

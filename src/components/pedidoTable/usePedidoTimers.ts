@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import type { DetalhePedido } from "../../types/conferencia";
 import { FINAL_OK_COLORS } from "./constants";
 import { normalizeStatus } from "./helpers";
-import { saveOptimisticFinalized, saveTimers, type OptimisticFinalizedByNunota, type TimerMap } from "./storage";
+import {
+  saveOptimisticFinalized,
+  saveTimers,
+  type OptimisticFinalizedByNunota,
+  type TimerMap,
+} from "./storage";
 import { statusColors, statusMap } from "../../config/status";
 
 interface UsePedidoTimersParams {
@@ -17,6 +22,7 @@ export function usePedidoTimers({
   setOptimisticFinalizedByNunota,
 }: UsePedidoTimersParams) {
   const [timerByNunota, setTimerByNunota] = useState<TimerMap>({});
+  const [tick, setTick] = useState(0);
 
   function isOptimisticFinal(nunota: number) {
     const exp = Number(optimisticFinalizedByNunota[nunota] ?? 0);
@@ -72,6 +78,15 @@ export function usePedidoTimers({
     };
   }
 
+  // ticker visual: força re-render a cada 1s para o cronômetro andar sem clique
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setTick((t) => t + 1);
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, []);
+
   useEffect(() => {
     if (!pedidos?.length) return;
 
@@ -85,10 +100,13 @@ export function usePedidoTimers({
         const visual = getVisualStatus(p);
         const isFinalizadaOk = visual.isFinalOk;
 
-        if (isFinalizadaOk && !visual.isOptimistic) removerOptimisticFinal(nunota);
+        if (isFinalizadaOk && !visual.isOptimistic) {
+          removerOptimisticFinal(nunota);
+        }
 
         const current = next[nunota] ?? { startAt: null, elapsedMs: 0, running: false };
 
+        // Em AC: mantém correndo localmente para alertas visuais
         if (statusCode === "AC" && !isFinalizadaOk) {
           next[nunota] = !current.running
             ? { startAt: now, elapsedMs: current.elapsedMs, running: true }
@@ -96,16 +114,27 @@ export function usePedidoTimers({
           continue;
         }
 
+        // Finalizado: trava no tempo oficial do backend
         if (isFinalizadaOk) {
-          if (current.running && current.startAt) {
+          const tempoBackendMs = Number((p as any).tempoConferenciaMs ?? 0);
+
+          if (tempoBackendMs > 0) {
+            next[nunota] = {
+              startAt: null,
+              elapsedMs: tempoBackendMs,
+              running: false,
+            };
+          } else if (current.running && current.startAt) {
             const elapsed = current.elapsedMs + (now - current.startAt);
             next[nunota] = { startAt: null, elapsedMs: elapsed, running: false };
           } else {
             next[nunota] = { startAt: null, elapsedMs: current.elapsedMs, running: false };
           }
+
           continue;
         }
 
+        // Outros status: pausa e acumula
         if (current.running && current.startAt) {
           const elapsed = current.elapsedMs + (now - current.startAt);
           next[nunota] = { startAt: null, elapsedMs: elapsed, running: false };
@@ -117,7 +146,7 @@ export function usePedidoTimers({
       saveTimers(next);
       return next;
     });
-  }, [pedidos, optimisticFinalizedByNunota]);
+  }, [pedidos, optimisticFinalizedByNunota, tick]);
 
   return {
     timerByNunota,

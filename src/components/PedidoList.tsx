@@ -570,8 +570,10 @@ export function PedidoList({
     let base = pedidos;
 
     if (somenteAguardando) {
-      base = base.filter((p) => normalizeStatus((p as any).statusConferencia) === "AC");
-    }
+  base = base.filter((p) =>
+    ["A", "AC", "AL"].includes(normalizeStatus((p as any).statusConferencia))
+  );
+}
 
     if (vendedorFiltro) {
       base = base.filter(

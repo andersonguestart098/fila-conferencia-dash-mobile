@@ -82,47 +82,37 @@ export function usePedidoActions({
     return nuconf;
   }
 
-  async function confirmarConferenteEFinalizar(p: DetalhePedido, conf: Conferente) {
-    setLoadingConfirmacao(p.nunota);
+async function confirmarConferenteEFinalizar(p: DetalhePedido, conf: Conferente) {
+  setLoadingConfirmacao(p.nunota);
 
-    try {
-      setConferenteByNunota((prev) => {
-        const next = { ...prev, [p.nunota]: conf };
-        saveConferenteByNunota(next);
-        return next;
-      });
+  try {
+    setConferenteByNunota((prev) => {
+      const next = { ...prev, [p.nunota]: conf };
+      saveConferenteByNunota(next);
+      return next;
+    });
 
-      await definirConferenteNoBackend(p.nunota, conf);
-      const nuconf = await garantirNuconf(p, conf.codUsuario);
-      await finalizarConferenciaViaBackend(nuconf, conf.codUsuario);
+    await definirConferenteNoBackend(p.nunota, conf);
+    const nuconf = await garantirNuconf(p, conf.codUsuario);
+    await finalizarConferenciaViaBackend(nuconf, conf.codUsuario);
 
-      marcarOptimisticFinal(p.nunota);
+    marcarOptimisticFinal(p.nunota);
 
-      setSuccessModal({
-        open: true,
-        nunota: p.nunota,
-        nuconf,
-        conferenteNome: conf.nome,
-      });
+    setSuccessModal({
+      open: true,
+      nunota: p.nunota,
+      nuconf,
+      conferenteNome: conf.nome,
+    });
 
-      if (onRefresh) onRefresh();
-    } catch (err: any) {
-      console.error("❌ erro ao finalizar:", err);
-
-      const status = err?.response?.status;
-      const msgBackend = err?.response?.data?.message || err?.response?.data?.error;
-
-      if (status === 409) {
-        alert(msgBackend || "Este pedido já foi finalizado por outro usuário.");
-        if (onRefresh) onRefresh();
-        return;
-      }
-
-      alert("Não consegui finalizar a conferência. Verifique o backend/logs.");
-    } finally {
-      setLoadingConfirmacao(null);
-    }
+    if (onRefresh) onRefresh();
+  } catch (err: any) {
+    console.error("❌ erro ao finalizar:", err);
+    throw err;
+  } finally {
+    setLoadingConfirmacao(null);
   }
+}
 
   return {
     loadingConfirmacao,

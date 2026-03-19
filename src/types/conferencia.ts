@@ -36,6 +36,8 @@ export interface DetalhePedido {
   nomeConferente?: string | null;
   
   avatarUrlConferente?: string | null;
+  
+  tempoConferenciaMs?: number | null;
 
   itens: ItemConferencia[];
 }

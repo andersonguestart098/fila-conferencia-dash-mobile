@@ -17,7 +17,7 @@ export function itemKey(item: any, idx: number) {
 }
 
 export function podeFinalizar(statusCode: string) {
-  return statusCode === "AC" || statusCode === "A";
+  return ["A", "AC", "AL"].includes(normalizeStatus(statusCode));
 }
 
 export function isQtdMatch(qtdEsperada: number, digitada: number | ""): boolean {
@@ -33,7 +33,7 @@ export function isQtdMatch(qtdEsperada: number, digitada: number | ""): boolean 
 }
 
 export function aceitaDecimalPorProduto(codProd: number | null | undefined): boolean {
-  return [15, 16].includes(Number(codProd));
+  return [15, 16, 13354].includes(Number(codProd));
 }
 
 export function isGrupoConstrucaoSeco(codGrupoProd: number | string | null | undefined): boolean {
