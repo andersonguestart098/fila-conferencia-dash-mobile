@@ -318,11 +318,26 @@ export function PedidoTable({
               const checklist = pedidoChecklistOk(p, checkedByNunota, qtdByNunota);
               const bloqueioChecklist = !checklist.ok;
 
+              const motivoBloqueio = {
+                statusInvalido: !podeFinalizarAgora,
+                jaFinalizado: visual.isFinalOk,
+                carregando: isLoadingThis,
+                checklistInvalido: bloqueioChecklist,
+              };
+
+              console.log("DEBUG FINALIZAR", {
+                nunota: p.nunota,
+                statusOriginal: (p as any).statusConferencia,
+                statusCode,
+                checklist,
+                motivoBloqueio,
+              });
+
               const disabledFinalizar =
-              !podeFinalizarAgora ||
-              visual.isFinalOk ||
-              isLoadingThis ||
-              bloqueioChecklist;
+                motivoBloqueio.statusInvalido ||
+                motivoBloqueio.jaFinalizado ||
+                motivoBloqueio.carregando ||
+                motivoBloqueio.checklistInvalido;
 
               return (
                 <React.Fragment key={p.nunota}>

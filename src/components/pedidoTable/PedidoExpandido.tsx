@@ -20,6 +20,24 @@ interface PedidoExpandidoProps {
   setQtdConferida: (nunota: number, key: string, value: number | "") => void;
 }
 
+function formatQuantidadeVisual(valor: number, aceitaDecimal: boolean): string {
+  const n = Number(valor ?? 0);
+
+  if (!Number.isFinite(n)) return "0";
+
+  if (!aceitaDecimal) {
+    return String(Math.round(n));
+  }
+
+  const arredondado = Math.round(n * 1000) / 1000;
+
+  if (Number.isInteger(arredondado)) {
+    return String(arredondado);
+  }
+
+  return arredondado.toFixed(3).replace(/\.?0+$/, "");
+}
+
 export function PedidoExpandido({
   pedido,
   checkedByNunota,
@@ -87,11 +105,21 @@ export function PedidoExpandido({
               const qtdEsperada = getQtdEsperadaItem(item);
               const qtdNeg = getQtdPedidoItem(item);
 
-              const estoqueBruto = Number((item as any).estoqueBruto ?? 0);
-              const estoqueDisponivelAjustado = getEstoqueDisponivelAjustado(item);
-
               const grupoLiberado = isGrupoConstrucaoSeco((item as any).codGrupoProd);
               const aceitaDecimal = aceitaDecimalPorProduto((item as any).codProd);
+
+              const estoqueBrutoRaw = Number(
+                (item as any).estoqueBruto ??
+                (item as any).estoqueTotal ??
+                0
+              );
+
+              const estoqueDisponivelAjustado = getEstoqueDisponivelAjustado(item);
+
+              const estoqueBrutoVisual = formatQuantidadeVisual(estoqueBrutoRaw, aceitaDecimal);
+              const estoqueDisponivelVisual = formatQuantidadeVisual(estoqueDisponivelAjustado, aceitaDecimal);
+              const qtdNegVisual = formatQuantidadeVisual(qtdNeg, aceitaDecimal);
+              const qtdEsperadaVisual = formatQuantidadeVisual(qtdEsperada, aceitaDecimal);
 
               const key = itemKey(item, idx);
               const checked = !!checkedByNunota[pedido.nunota]?.[key];
@@ -131,13 +159,13 @@ export function PedidoExpandido({
                       </div>
 
                       <div style={{ marginTop: 6, fontSize: 13 }}>
-                        Qtd Pedido: <b>{qtdNeg}</b>
+                        Qtd Pedido: <b>{qtdNegVisual}</b>
                       </div>
 
                       <div style={{ marginTop: 2, fontSize: 13 }}>
                         Estoque Bruto:{" "}
                         <b className={showEstoqueError ? "estoque-insuficiente" : "estoque-suficiente"}>
-                          {estoqueBruto}
+                          {estoqueBrutoVisual}
                         </b>
                       </div>
 
@@ -149,13 +177,13 @@ export function PedidoExpandido({
                             fontWeight: 900,
                           }}
                         >
-                          {estoqueDisponivelAjustado}
+                          {estoqueDisponivelVisual}
                         </b>
                       </div>
 
                       {showEstoqueError && (
                         <div style={{ marginTop: 6, fontSize: 12, fontWeight: 900, color: "#b91c1c" }}>
-                          ⚠️ Estoque disponível insuficiente! ({estoqueDisponivelAjustado} disponível, {qtdNeg} necessário)
+                          ⚠️ Estoque disponível insuficiente! ({estoqueDisponivelVisual} disponível, {qtdNegVisual} necessário)
                         </div>
                       )}
 
@@ -210,7 +238,7 @@ export function PedidoExpandido({
                       />
 
                       <div className={`qtd-hint ${match ? "qtd-hint-ok" : "qtd-hint-bad"}`}>
-                        {digitadaRaw === "" ? "—" : match ? "OK" : `≠ ${qtdEsperada}`}
+                        {digitadaRaw === "" ? "—" : match ? "OK" : `≠ ${qtdEsperadaVisual}`}
                       </div>
                     </div>
 

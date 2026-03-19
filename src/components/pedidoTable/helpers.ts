@@ -1,5 +1,7 @@
 import type { DetalhePedido, ItemConferencia } from "../../types/conferencia";
 
+const EPS = 0.001;
+
 export function normalizeStatus(status: any): string {
   return String(status ?? "").trim().toUpperCase();
 }
@@ -20,20 +22,46 @@ export function podeFinalizar(statusCode: string) {
   return ["A", "AC", "AL"].includes(normalizeStatus(statusCode));
 }
 
-export function isQtdMatch(qtdEsperada: number, digitada: number | ""): boolean {
-  if (digitada === "") return false;
+function toNumber(value: any): number {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
 
-  const a = Number(qtdEsperada ?? 0);
-  const b = Number(digitada);
-
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-
-  const EPS = 1e-6;
-  return Math.abs(a - b) < EPS;
+function round3(value: any): number {
+  const n = toNumber(value);
+  return Math.round(n * 1000) / 1000;
 }
 
 export function aceitaDecimalPorProduto(codProd: number | null | undefined): boolean {
   return [15, 16, 13354].includes(Number(codProd));
+}
+
+function normalizeByProduto(value: any, codProd: number | null | undefined): number {
+  const n = toNumber(value);
+
+  if (aceitaDecimalPorProduto(codProd)) {
+    return round3(n);
+  }
+
+  return Math.round(n);
+}
+
+export function isQtdMatch(itemOrQtdEsperada: ItemConferencia | number, digitada: number | ""): boolean {
+  if (digitada === "") return false;
+
+  if (typeof itemOrQtdEsperada === "number") {
+    const a = round3(itemOrQtdEsperada);
+    const b = round3(digitada);
+    return Math.abs(a - b) <= EPS;
+  }
+
+  const item = itemOrQtdEsperada;
+  const codProd = (item as any).codProd;
+
+  const esperada = normalizeByProduto(getQtdEsperadaItem(item), codProd);
+  const digitadaNorm = normalizeByProduto(digitada, codProd);
+
+  return Math.abs(esperada - digitadaNorm) <= EPS;
 }
 
 export function isGrupoConstrucaoSeco(codGrupoProd: number | string | null | undefined): boolean {
@@ -42,24 +70,64 @@ export function isGrupoConstrucaoSeco(codGrupoProd: number | string | null | und
 }
 
 export function getQtdEsperadaItem(item: ItemConferencia): number {
-  return Number(item.qtdConferida ?? item.qtdAtual ?? item.qtdOriginal ?? item.qtdEsperada ?? 0) || 0;
+  const codProd = (item as any).codProd;
+
+  return normalizeByProduto(
+    (item as any).qtdEsperada ??
+      (item as any).qtdAtual ??
+      (item as any).qtdOriginal ??
+      (item as any).qtdConferida ??
+      0,
+    codProd
+  );
 }
 
 export function getQtdPedidoItem(item: ItemConferencia): number {
-  return Number(item.qtdNeg ?? getQtdEsperadaItem(item)) || 0;
+  const codProd = (item as any).codProd;
+
+  return normalizeByProduto(
+    (item as any).qtdNeg ??
+      (item as any).qtdAtual ??
+      (item as any).qtdEsperada ??
+      (item as any).qtdOriginal ??
+      0,
+    codProd
+  );
+}
+
+export function getEstoqueDisponivelOriginal(item: ItemConferencia): number {
+  return round3(
+    (item as any).estoqueDisponivel ??
+      (item as any).estoqueDisp ??
+      0
+  );
+}
+
+export function getEstoqueBrutoItem(item: ItemConferencia): number {
+  const codProd = (item as any).codProd;
+
+  return normalizeByProduto(
+    (item as any).estoqueBruto ??
+      (item as any).estoqueTotal ??
+      0,
+    codProd
+  );
 }
 
 export function getEstoqueDisponivelAjustado(item: ItemConferencia): number {
+  const codProd = (item as any).codProd;
   const qtdNeg = getQtdPedidoItem(item);
-  const estoqueDisponivel = Number((item as any).estoqueDisponivel ?? 0);
-  return estoqueDisponivel + qtdNeg;
+  const estoqueDisponivelOriginal = getEstoqueDisponivelOriginal(item);
+
+  return normalizeByProduto(estoqueDisponivelOriginal + qtdNeg, codProd);
 }
 
 export function verificarEstoqueSuficiente(item: ItemConferencia): boolean {
-  const qtdNeg = getQtdPedidoItem(item);
-  const estoqueDisponivelAjustado = getEstoqueDisponivelAjustado(item);
+  const codProd = (item as any).codProd;
+  const qtdNeg = normalizeByProduto(getQtdPedidoItem(item), codProd);
+  const estoqueDisponivelAjustado = normalizeByProduto(getEstoqueDisponivelAjustado(item), codProd);
 
-  return estoqueDisponivelAjustado >= qtdNeg && estoqueDisponivelAjustado >= 0;
+  return estoqueDisponivelAjustado + EPS >= qtdNeg;
 }
 
 export type CheckedItemsByNunota = Record<number, Record<string, boolean>>;
@@ -69,15 +137,7 @@ export function pedidoChecklistOk(
   p: DetalhePedido,
   checkedByNunota: CheckedItemsByNunota,
   qtdByNunota: QtdByNunota
-): {
-  allChecked: boolean;
-  allQtyOk: boolean;
-  allEstoqueOk: boolean;
-  ok: boolean;
-  done: number;
-  okQty: number;
-  estoqueOk: number;
-} {
+) {
   const mapCheck = checkedByNunota[p.nunota] ?? {};
   const mapQtd = qtdByNunota[p.nunota] ?? {};
   const total = p.itens.length;
@@ -93,10 +153,9 @@ export function pedidoChecklistOk(
     const checked = !!mapCheck[k];
     if (checked) done++;
 
-    const qtdEsperada = getQtdEsperadaItem(item);
     const digitada = mapQtd[k] ?? "";
 
-    if (isQtdMatch(qtdEsperada, digitada)) {
+    if (isQtdMatch(item, digitada)) {
       okQty++;
     }
 
