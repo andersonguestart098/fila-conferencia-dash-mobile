@@ -304,15 +304,7 @@ export function PedidoTable({
               const elapsedMin = Math.floor(liveElapsedMs / 60000);
               const alerta5min =
                 statusCode === "AC" && elapsedMin >= 5 && !isOptimisticFinal(p.nunota);
-
-                console.log("DEBUG_TEMPO_PEDIDO", {
-                  nunota: p.nunota,
-                  statusConferencia: p.statusConferencia,
-                  tempoConferenciaMs: p.tempoConferenciaMs,
-                  visualIsFinalOk: visual.isFinalOk,
-                  timerLocal: timerByNunota[p.nunota],
-                });
-
+                
               const confExibicao = getConferenteExibicao(p);
 
               const nomeConferenteTexto =
