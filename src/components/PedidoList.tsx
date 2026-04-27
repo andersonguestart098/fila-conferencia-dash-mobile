@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DetalhePedido } from "../types/conferencia";
 import { statusColors, statusMap } from "../config/status";
 import { dispararAlertasVoz } from "../../public/audio/audioManager";
-import { api } from "../api/client"; // ✅ usa o axios com baseURL do Heroku
+import { api } from "../api/client";
 
 import Lottie from "lottie-react";
 
@@ -18,12 +18,11 @@ interface PedidoListProps {
   erro: string | null;
   selecionado: DetalhePedido | null;
   onSelect: (pedido: DetalhePedido) => void;
-  onRefresh?: () => void; // ✅ para recarregar lista depois do /iniciar
+  onRefresh?: () => void;
 }
 
 const ITENS_POR_PAGINA = 50;
 
-// 🧑‍💼 Lista fixa de vendedores para filtro
 const VENDEDORES: string[] = [
   "LUIS TIZONI",
   "MARCIA MELLER",
@@ -46,7 +45,6 @@ const VENDEDORES: string[] = [
   "DANIEL MACCARI",
 ];
 
-// ✅ conferentes (por enquanto fixo)
 type Conferente = { codUsuario: number; nome: string };
 const CONFERENTES: Conferente[] = [
   { codUsuario: 1, nome: "Manoel" },

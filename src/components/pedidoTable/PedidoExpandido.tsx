@@ -4,7 +4,7 @@ import {
   getEstoqueDisponivelAjustado,
   getQtdEsperadaItem,
   getQtdPedidoItem,
-  isGrupoConstrucaoSeco,
+  isGrupoLiberadoComExcecao,
   isQtdMatch,
   itemKey,
   verificarEstoqueSuficiente,
@@ -59,10 +59,14 @@ export function PedidoExpandido({
   }, 0);
 
   const estoqueOk = pedido.itens.reduce((acc, it) => {
-    const grupoLiberado = isGrupoConstrucaoSeco((it as any).codGrupoProd);
-    if (grupoLiberado) return acc + 1;
-    return acc + (verificarEstoqueSuficiente(it) ? 1 : 0);
-  }, 0);
+  const grupoLiberado = isGrupoLiberadoComExcecao(
+    (it as any).codGrupoProd,
+    (it as any).codProd
+  );
+
+  if (grupoLiberado) return acc + 1;
+  return acc + (verificarEstoqueSuficiente(it) ? 1 : 0);
+}, 0);
 
   return (
     <tr className="row-detail">
@@ -105,7 +109,10 @@ export function PedidoExpandido({
               const qtdEsperada = getQtdEsperadaItem(item);
               const qtdNeg = getQtdPedidoItem(item);
 
-              const grupoLiberado = isGrupoConstrucaoSeco((item as any).codGrupoProd);
+              const grupoLiberado = isGrupoLiberadoComExcecao(
+                  (item as any).codGrupoProd,
+                  (item as any).codProd
+              );
               const aceitaDecimal = aceitaDecimalPorProduto((item as any).codProd);
 
               const estoqueBrutoRaw = Number(

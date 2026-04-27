@@ -2,6 +2,14 @@ import type { DetalhePedido, ItemConferencia } from "../../types/conferencia";
 
 const EPS = 0.001;
 
+const PRODUTOS_BLOQUEADOS = new Set([
+  14048, 13931, 14057, 14373, 15056, 14372, 14052, 15069, 14053, 14370,
+  14669, 14051, 14369, 14524, 106283, 106279, 106278, 106282, 106276,
+  106280, 106281, 106284, 106277, 106290, 10270, 106313, 13716, 15970,
+  15975, 15273, 11516, 12707, 12734, 13066, 13153, 13154, 14686, 15221,
+  15271, 15301, 10998, 12377, 106317, 9, 11, 6545, 6726, 6654, 6655
+]);
+
 export function normalizeStatus(status: any): string {
   return String(status ?? "").trim().toUpperCase();
 }
@@ -62,6 +70,23 @@ export function isQtdMatch(itemOrQtdEsperada: ItemConferencia | number, digitada
   const digitadaNorm = normalizeByProduto(digitada, codProd);
 
   return Math.abs(esperada - digitadaNorm) <= EPS;
+}
+
+export function isGrupoLiberadoComExcecao(
+  codGrupoProd: number | string | null | undefined,
+  codProd: number | string | null | undefined
+): boolean {
+  if (codGrupoProd == null) return false;
+
+  const isGrupo10 = String(codGrupoProd).startsWith("10");
+
+  if (!isGrupo10) return false;
+
+  if (codProd != null && PRODUTOS_BLOQUEADOS.has(Number(codProd))) {
+    return false;
+  }
+
+  return true;
 }
 
 export function isGrupoConstrucaoSeco(codGrupoProd: number | string | null | undefined): boolean {
