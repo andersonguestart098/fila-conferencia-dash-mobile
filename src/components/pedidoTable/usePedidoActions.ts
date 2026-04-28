@@ -118,60 +118,72 @@ export function usePedidoActions({
     return status === "A" || status === "AL";
   }
 
-  async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<number> {
-    const nunota = Number(p.nunota);
-    const status = normalizeStatus((p as any).statusConferencia);
+async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<number> {
+  const nunota = Number(p.nunota);
+  const status = normalizeStatus((p as any).statusConferencia);
 
-    const nuconfPayload = getNuconfDoPayload(p);
-    if (nuconfPayload > 0) {
-      console.log("ℹ️ [CONFERENCIA] usando nuconf do payload", {
-        nunota,
-        status,
-        nuconf: nuconfPayload,
-      });
-      return nuconfPayload;
-    }
-
-    const nuconfCache = getNuconfDoCache(nunota);
-    if (nuconfCache > 0) {
-      console.log("ℹ️ [CONFERENCIA] usando nuconf do cache", {
-        nunota,
-        status,
-        nuconf: nuconfCache,
-      });
-      return nuconfCache;
-    }
-
-    if (podeIniciarPeloStatus(p)) {
-      console.log("ℹ️ [CONFERENCIA] sem nuconf, iniciando conferência", {
-        nunota,
-        status,
-        codUsuario,
-      });
-
-      const nuconfNovo = await iniciarEObterNuconf(nunota, codUsuario);
-
-      setNuconfByNunota((prev) => {
-        const next = { ...prev, [nunota]: nuconfNovo };
-        saveNuconfByNunota(next);
-        return next;
-      });
-
-      return nuconfNovo;
-    }
-
-    if (status === "AC") {
-      throw new Error(
-        `O pedido #${nunota} já está em conferência (AC), mas o nuconf não veio no payload nem no cache. ` +
-          `Neste caso o front não deve chamar /iniciar novamente. ` +
-          `Inclua o nuconf na listagem de pedidos pendentes ou crie um endpoint para buscar o nuconf pela nunota.`
-      );
-    }
-
-    throw new Error(
-      `Não foi possível garantir NUCONF para o pedido #${nunota}. Status atual: ${status || "(vazio)"}.`
-    );
+  const nuconfPayload = getNuconfDoPayload(p);
+  if (nuconfPayload > 0) {
+    console.log("ℹ️ [CONFERENCIA] usando nuconf do payload", {
+      nunota,
+      status,
+      nuconf: nuconfPayload,
+    });
+    return nuconfPayload;
   }
+
+  const nuconfCache = getNuconfDoCache(nunota);
+  if (nuconfCache > 0) {
+    console.log("ℹ️ [CONFERENCIA] usando nuconf do cache", {
+      nunota,
+      status,
+      nuconf: nuconfCache,
+    });
+    return nuconfCache;
+  }
+
+  if (podeIniciarPeloStatus(p)) {
+    console.log("ℹ️ [CONFERENCIA] sem nuconf, iniciando conferência", {
+      nunota,
+      status,
+      codUsuario,
+    });
+
+    const nuconfNovo = await iniciarEObterNuconf(nunota, codUsuario);
+
+    setNuconfByNunota((prev) => {
+      const next = { ...prev, [nunota]: nuconfNovo };
+      saveNuconfByNunota(next);
+      return next;
+    });
+
+    return nuconfNovo;
+  }
+
+  if (status === "AC") {
+    console.warn("⚠️ [CONFERENCIA] AC sem nuconf → tratando como A e iniciando nova conferência", {
+      nunota,
+      status,
+      codUsuario,
+      nuconfPayload,
+      nuconfCache,
+    });
+
+    const nuconfNovo = await iniciarEObterNuconf(nunota, codUsuario);
+
+    setNuconfByNunota((prev) => {
+      const next = { ...prev, [nunota]: nuconfNovo };
+      saveNuconfByNunota(next);
+      return next;
+    });
+
+    return nuconfNovo;
+  }
+
+  throw new Error(
+    `Não foi possível garantir NUCONF para o pedido #${nunota}. Status atual: ${status || "(vazio)"}.`
+  );
+}
 
   async function confirmarConferenteEFinalizar(p: DetalhePedido, conf: Conferente) {
     setLoadingConfirmacao(p.nunota);
