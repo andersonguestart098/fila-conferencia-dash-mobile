@@ -348,13 +348,12 @@ export function PedidoTable({
 
               const conferenciaIniciada =
                 Number((p as any).nuconf ?? 0) > 0 ||
-                Number(nuconfByNunota[p.nunota] ?? 0) > 0 ||
-                statusCode === "A";
+                Number(nuconfByNunota[p.nunota] ?? 0) > 0;
 
               const disabledIniciar =
                 isLoadingThis ||
                 visual.isFinalOk ||
-                !["AL", "AC"].includes(statusCode);
+                statusCode !== "AC";
 
               const motivoBloqueio = {
                 statusInvalido: !podeFinalizarAgora,
