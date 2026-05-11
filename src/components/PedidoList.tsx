@@ -4,6 +4,8 @@ import type { DetalhePedido } from "../types/conferencia";
 import { statusColors, statusMap } from "../config/status";
 import { dispararAlertasVoz } from "../../public/audio/audioManager";
 import { api } from "../api/client";
+import { conectarConferenciaStream } from "../api/conferenciaStream";
+
 
 import Lottie from "lottie-react";
 
@@ -293,6 +295,8 @@ export function PedidoList({
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(1);
 
+  console.log("🧩 [PEDIDO_LIST] componente renderizado");
+
   const [somenteAguardando, setSomenteAguardando] = useState(false);
   const [vendedorFiltro, setVendedorFiltro] = useState<string | null>(null);
 
@@ -317,6 +321,47 @@ export function PedidoList({
   const somIntervalRef = useRef<number | null>(null);
 
   const [ultimosStatus, setUltimosStatus] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+  console.log("🚀 [PEDIDO_LIST] iniciando conexão SSE");
+
+  const disconnect = conectarConferenciaStream({
+    onConnected: () => {
+      console.log("📡 [PEDIDO_LIST] SSE conectado");
+    },
+
+    onPedidoStatusChanged: (event) => {
+      console.log("📡 [PEDIDO_LIST] pedido_status_changed recebido", event);
+
+      if (onRefresh) {
+        console.log("🔄 [PEDIDO_LIST] chamando onRefresh por pedido_status_changed");
+        onRefresh();
+      } else {
+        console.warn("⚠️ [PEDIDO_LIST] onRefresh não foi passado");
+      }
+    },
+
+    onPedidoFinalizado: (event) => {
+      console.log("📡 [PEDIDO_LIST] pedido_finalizado recebido", event);
+
+      if (onRefresh) {
+        console.log("🔄 [PEDIDO_LIST] chamando onRefresh por pedido_finalizado");
+        onRefresh();
+      } else {
+        console.warn("⚠️ [PEDIDO_LIST] onRefresh não foi passado");
+      }
+    },
+
+    onError: (error) => {
+      console.warn("⚠️ [PEDIDO_LIST] erro SSE", error);
+    },
+  });
+
+  return () => {
+    console.log("🔌 [PEDIDO_LIST] encerrando conexão SSE");
+    disconnect();
+  };
+}, [onRefresh]);
 
   // ⏱ força re-render 1x/segundo
   const [, forceTick] = useState(0);

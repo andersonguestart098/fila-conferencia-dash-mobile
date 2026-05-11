@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { DetalhePedido } from "../types/conferencia";
 import "./pedidoTable/styles.css";
 
@@ -14,6 +14,7 @@ import { usePedidoActions } from "./pedidoTable/usePedidoActions";
 import { usePedidoAlerts } from "./pedidoTable/usePedidoAlerts";
 import { usePedidoTableState } from "./pedidoTable/usePedidoTableState";
 import { usePedidoTimers } from "./pedidoTable/usePedidoTimers";
+import type { Conferente } from "./pedidoTable/storage";
 
 interface PedidoTableProps {
   pedidos: DetalhePedido[];
@@ -31,6 +32,8 @@ export function PedidoTable({
   onSelect,
   onRefresh,
 }: PedidoTableProps) {
+  const [modalModo, setModalModo] = useState<"iniciar" | "finalizar">("finalizar");
+
   const state = usePedidoTableState(pedidos);
 
   const {
@@ -84,9 +87,7 @@ export function PedidoTable({
     setOptimisticFinalizedByNunota,
   });
 
-  const {
-    tocarSomAlerta,
-  } = usePedidoAlerts({
+  const { tocarSomAlerta } = usePedidoAlerts({
     pedidos,
     somAlertaDesativado,
     timerByNunota,
@@ -97,6 +98,7 @@ export function PedidoTable({
     loadingConfirmacao,
     successModal,
     setSuccessModal,
+    iniciarConferenciaPedido,
     confirmarConferenteEFinalizar,
   } = usePedidoActions({
     nuconfByNunota,
@@ -124,7 +126,15 @@ export function PedidoTable({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [successModal.open, finalizarNunotaOpen, loadingConfirmacao, setFiltrosOpen, setSuccessModal, setFinalizarNunotaOpen, setFinalizarConferenteId]);
+  }, [
+    successModal.open,
+    finalizarNunotaOpen,
+    loadingConfirmacao,
+    setFiltrosOpen,
+    setSuccessModal,
+    setFinalizarNunotaOpen,
+    setFinalizarConferenteId,
+  ]);
 
   useEffect(() => {
     const anyOpen = successModal.open || finalizarNunotaOpen !== null;
@@ -167,7 +177,7 @@ export function PedidoTable({
     return pedidoChecklistOk(pedidoModal, checkedByNunota, qtdByNunota);
   }, [pedidoModal, checkedByNunota, qtdByNunota]);
 
-  function getConferenteExibicao(p: DetalhePedido) {
+  function getConferenteExibicao(p: DetalhePedido): Conferente | null {
     const idBackend = (p as any).conferenteId as number | null | undefined;
     const nomeBackend = (p as any).conferenteNome as string | null | undefined;
     const nomeConferenteOld = (p as any).nomeConferente as string | null | undefined;
@@ -195,6 +205,11 @@ export function PedidoTable({
     return conferenteByNunota[p.nunota] ?? null;
   }
 
+  const conferenteAtualModal = useMemo(() => {
+    if (!pedidoModal) return null;
+    return getConferenteExibicao(pedidoModal);
+  }, [pedidoModal, conferenteByNunota]);
+
   if (loadingInicial && pedidos.length === 0) return <div className="center">Carregando…</div>;
   if (erro && pedidos.length === 0) return <div className="center">{erro}</div>;
 
@@ -212,7 +227,9 @@ export function PedidoTable({
         open={finalizarNunotaOpen !== null}
         pedido={pedidoModal}
         loading={loadingConfirmacao === pedidoModal?.nunota}
+        modo={modalModo}
         checklist={checklistModal}
+        conferenteAtual={conferenteAtualModal}
         conferenteId={finalizarConferenteId}
         setConferenteId={setFinalizarConferenteId}
         onClose={() => {
@@ -222,17 +239,29 @@ export function PedidoTable({
         onConfirm={async (conf) => {
           if (!pedidoModal) return;
 
-          if (!conf || !conf.codUsuario || conf.codUsuario <= 0) {
-            alert("Selecione um conferente antes de finalizar.");
-            return;
-          }
-
           try {
-            await confirmarConferenteEFinalizar(pedidoModal, conf);
+            if (modalModo === "iniciar") {
+              if (!conf || !conf.codUsuario || conf.codUsuario <= 0) {
+                alert("Selecione um conferente.");
+                return;
+              }
+
+              await iniciarConferenciaPedido(pedidoModal, conf);
+            } else {
+              const confAtual = getConferenteExibicao(pedidoModal);
+
+              if (!confAtual || !confAtual.codUsuario || confAtual.codUsuario <= 0) {
+                alert("Conferente não encontrado. Inicie a conferência novamente.");
+                return;
+              }
+
+              await confirmarConferenteEFinalizar(pedidoModal, confAtual);
+            }
+
             setFinalizarNunotaOpen(null);
             setFinalizarConferenteId("");
           } catch (error: any) {
-            console.error("Erro ao confirmar/finalizar conferência:", error);
+            console.error("Erro na ação de conferência:", error);
 
             const status = error?.response?.status;
             const mensagem =
@@ -240,7 +269,7 @@ export function PedidoTable({
               error?.response?.data?.mensagem ||
               error?.response?.data?.error ||
               error?.message ||
-              "Não foi possível finalizar a conferência.";
+              "Não foi possível executar a ação.";
 
             if (status === 409) {
               alert(mensagem || "Este pedido já foi finalizado por outro usuário.");
@@ -298,13 +327,12 @@ export function PedidoTable({
                 visual.isFinalOk && tempoBackendMs > 0
                   ? tempoBackendMs
                   : timer.running && timer.startAt
-                    ? timer.elapsedMs + (now - timer.startAt)
-                    : timer.elapsedMs;
+                  ? timer.elapsedMs + (now - timer.startAt)
+                  : timer.elapsedMs;
 
               const elapsedMin = Math.floor(liveElapsedMs / 60000);
-              const alerta5min =
-                statusCode === "AC" && elapsedMin >= 5 && !isOptimisticFinal(p.nunota);
-                
+              const alerta5min = statusCode === "AC" && elapsedMin >= 5 && !isOptimisticFinal(p.nunota);
+
               const confExibicao = getConferenteExibicao(p);
 
               const nomeConferenteTexto =
@@ -318,25 +346,29 @@ export function PedidoTable({
               const checklist = pedidoChecklistOk(p, checkedByNunota, qtdByNunota);
               const bloqueioChecklist = !checklist.ok;
 
+              const conferenciaIniciada =
+                Number((p as any).nuconf ?? 0) > 0 ||
+                Number(nuconfByNunota[p.nunota] ?? 0) > 0 ||
+                statusCode === "A";
+
+              const disabledIniciar =
+                isLoadingThis ||
+                visual.isFinalOk ||
+                !["AL", "AC"].includes(statusCode);
+
               const motivoBloqueio = {
                 statusInvalido: !podeFinalizarAgora,
                 jaFinalizado: visual.isFinalOk,
                 carregando: isLoadingThis,
+                naoIniciada: !conferenciaIniciada,
                 checklistInvalido: bloqueioChecklist,
               };
-
-              console.log("DEBUG FINALIZAR", {
-                nunota: p.nunota,
-                statusOriginal: (p as any).statusConferencia,
-                statusCode,
-                checklist,
-                motivoBloqueio,
-              });
 
               const disabledFinalizar =
                 motivoBloqueio.statusInvalido ||
                 motivoBloqueio.jaFinalizado ||
                 motivoBloqueio.carregando ||
+                motivoBloqueio.naoIniciada ||
                 motivoBloqueio.checklistInvalido;
 
               return (
@@ -350,13 +382,21 @@ export function PedidoTable({
                     alerta5min={alerta5min}
                     liveElapsedMs={liveElapsedMs}
                     nomeConferenteTexto={nomeConferenteTexto}
+                    conferenciaIniciada={conferenciaIniciada}
+                    disabledIniciar={disabledIniciar}
                     disabledFinalizar={disabledFinalizar}
                     bloqueioChecklist={bloqueioChecklist}
                     onToggleExpand={() => {
                       onSelect(p);
                       setExpandedNunota((cur) => (cur === p.nunota ? null : p.nunota));
                     }}
+                    onIniciar={() => {
+                      setModalModo("iniciar");
+                      setFinalizarNunotaOpen(p.nunota);
+                      setFinalizarConferenteId((confExibicao?.codUsuario ?? "") as any);
+                    }}
                     onFinalizar={() => {
+                      setModalModo("finalizar");
                       setFinalizarNunotaOpen(p.nunota);
                       setFinalizarConferenteId((confExibicao?.codUsuario ?? "") as any);
                     }}
@@ -370,6 +410,7 @@ export function PedidoTable({
                       toggleItemChecked={toggleItemChecked}
                       marcarTodos={marcarTodos}
                       setQtdConferida={setQtdConferida}
+                      conferenciaIniciada={conferenciaIniciada}
                     />
                   )}
                 </React.Fragment>

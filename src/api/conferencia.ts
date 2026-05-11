@@ -4,19 +4,22 @@ import type { DetalhePedido } from "../types/conferencia";
 type ConferenteByNunota = Record<number, { codUsuario: number; nome: string }>;
 
 let pendentesEmAndamento: Promise<DetalhePedido[] | null> | null = null;
-let ultimoFetchAt = 0;
 
-const MIN_INTERVAL_MS = 10000; // 10s entre polls reais
+const API_DEBUG = true;
+
+function apiLog(message: string, data?: any) {
+  if (!API_DEBUG) return;
+  console.log(message, data ?? "");
+}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// retry leve só para timeout/network
 async function getComRetry<T>(
   url: string,
   config: any,
-  tentativas = 2
+  tentativas = 1
 ): Promise<T> {
   let lastErr: any;
 
@@ -123,43 +126,30 @@ function sincronizarConferentesLocais(pedidos: DetalhePedido[]) {
 
   if (atualizados > 0) {
     saveConferenteByNunota(updatedConferenteByNunota);
-    console.log(`🔄 [API] ${atualizados} conferentes sincronizados com localStorage`);
+    apiLog(`🔄 [API] ${atualizados} conferentes sincronizados com localStorage`);
   }
 }
 
 /**
- * Busca pedidos pendentes de forma SERIALIZADA.
+ * Busca pedidos pendentes sob demanda.
  *
- * Regras:
+ * Novo fluxo:
+ * - carga inicial da tela chama esta função uma vez
+ * - eventos SSE chamam esta função via onRefresh()
  * - se já existir request em andamento, reutiliza a mesma Promise
- * - respeita intervalo mínimo entre polls reais
- * - não aborta request anterior automaticamente
+ * - não faz controle de polling / intervalo mínimo
  */
 export async function buscarPedidosPendentes(): Promise<DetalhePedido[] | null> {
-  const agora = Date.now();
-
-  // Se já tem uma busca rodando, reaproveita
   if (pendentesEmAndamento) {
-    console.log("🟦 [API] Poll reaproveitado: já existe request em andamento.");
+    apiLog("🟦 [API] Busca reaproveitada: já existe request em andamento.");
     return pendentesEmAndamento;
-  }
-
-  // Respeita intervalo mínimo entre chamadas reais
-  const diff = agora - ultimoFetchAt;
-  if (ultimoFetchAt > 0 && diff < MIN_INTERVAL_MS) {
-    console.log(
-      `🟨 [API] Poll ignorado: aguardando janela mínima (${diff}ms < ${MIN_INTERVAL_MS}ms).`
-    );
-    return null;
   }
 
   pendentesEmAndamento = (async () => {
     try {
-      ultimoFetchAt = Date.now();
-
       const url = "/api/conferencia/pedidos-pendentes";
 
-      console.log("📡 [API] Buscando pedidos pendentes...");
+      apiLog("📡 [API] Buscando pedidos pendentes sob demanda...");
 
       const data = await getComRetry<any>(
         url,
@@ -177,15 +167,15 @@ export async function buscarPedidosPendentes(): Promise<DetalhePedido[] | null> 
       if (data.pedidos && Array.isArray(data.pedidos)) {
         const pedidos = data.pedidos as DetalhePedido[];
 
-        console.log("✅ [API] Dados recebidos do backend (novo formato):", {
+        apiLog("✅ [API] Dados recebidos do backend", {
           total: data.total,
           page: data.page,
           pageSize: data.pageSize,
           primeiroPedido: pedidos[0]
             ? {
                 nunota: pedidos[0].nunota,
+                statusConferencia: pedidos[0].statusConferencia,
                 itens: pedidos[0].itens?.length,
-                primeiroItemEstoque: pedidos[0].itens?.[0]?.estoqueDisponivel,
                 conferenteId: (pedidos[0] as any).conferenteId,
                 conferenteNome: (pedidos[0] as any).conferenteNome,
                 nomeConferente: pedidos[0].nomeConferente,
@@ -201,13 +191,13 @@ export async function buscarPedidosPendentes(): Promise<DetalhePedido[] | null> 
       if (Array.isArray(data)) {
         const pedidos = data as DetalhePedido[];
 
-        console.log("✅ [API] Dados recebidos do backend (formato antigo):", {
+        apiLog("✅ [API] Dados recebidos do backend em formato antigo", {
           total: pedidos.length,
           primeiroPedido: pedidos[0]
             ? {
                 nunota: pedidos[0].nunota,
+                statusConferencia: pedidos[0].statusConferencia,
                 itens: pedidos[0].itens?.length,
-                primeiroItemEstoque: pedidos[0].itens?.[0]?.estoqueDisponivel,
                 conferenteId: (pedidos[0] as any).conferenteId,
                 conferenteNome: (pedidos[0] as any).conferenteNome,
                 nomeConferente: pedidos[0].nomeConferente,
@@ -239,7 +229,9 @@ export async function buscarPedidosPendentes(): Promise<DetalhePedido[] | null> 
   return pendentesEmAndamento;
 }
 
-export async function buscarConferentesDoBackend(): Promise<{ codUsuario: number; nome: string }[]> {
+export async function buscarConferentesDoBackend(): Promise<
+  { codUsuario: number; nome: string }[]
+> {
   return [
     { codUsuario: 1, nome: "Manoel" },
     { codUsuario: 2, nome: "Anderson" },

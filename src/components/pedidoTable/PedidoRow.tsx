@@ -10,9 +10,14 @@ interface PedidoRowProps {
   alerta5min: boolean;
   liveElapsedMs: number;
   nomeConferenteTexto: string;
+
+  conferenciaIniciada: boolean;
+  disabledIniciar: boolean;
   disabledFinalizar: boolean;
   bloqueioChecklist: boolean;
+
   onToggleExpand: () => void;
+  onIniciar: () => void;
   onFinalizar: () => void;
 }
 
@@ -25,11 +30,17 @@ export function PedidoRow({
   alerta5min,
   liveElapsedMs,
   nomeConferenteTexto,
+  conferenciaIniciada,
+  disabledIniciar,
   disabledFinalizar,
   bloqueioChecklist,
   onToggleExpand,
+  onIniciar,
   onFinalizar,
 }: PedidoRowProps) {
+  const buttonLabel = conferenciaIniciada ? "Finalizar" : "Iniciar";
+  const disabled = conferenciaIniciada ? disabledFinalizar : disabledIniciar;
+
   return (
     <tr
       className={`row ${isExpanded ? "row-expanded" : ""} ${alerta5min ? "row-pulse" : ""}`}
@@ -39,7 +50,9 @@ export function PedidoRow({
         <div style={{ fontWeight: 900 }}>
           #{pedido.nunota}
           {pedido.numNota != null && pedido.numNota !== 0 && (
-            <span style={{ marginLeft: 8, opacity: 0.8, fontWeight: 700 }}>NF {pedido.numNota}</span>
+            <span style={{ marginLeft: 8, opacity: 0.8, fontWeight: 700 }}>
+              NF {pedido.numNota}
+            </span>
           )}
         </div>
         <div style={{ opacity: 0.75, fontSize: 12 }}>{pedido.itens.length} itens</div>
@@ -51,7 +64,11 @@ export function PedidoRow({
       <td>
         <span
           className="status-pill"
-          style={{ backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }}
+          style={{
+            backgroundColor: colors.bg,
+            borderColor: colors.border,
+            color: colors.text,
+          }}
           title={statusLabel}
         >
           <span className="status-dot" style={{ backgroundColor: colors.text }} />
@@ -71,9 +88,15 @@ export function PedidoRow({
 
       <td style={{ textAlign: "right" }}>
         <button
-          className={`btn-finalizar ${disabledFinalizar ? "btn-finalizar-inactive" : ""}`}
+          className={`btn-finalizar ${disabled ? "btn-finalizar-inactive" : ""}`}
           onClick={(e) => {
             e.stopPropagation();
+
+            if (!conferenciaIniciada) {
+              if (disabledIniciar) return;
+              onIniciar();
+              return;
+            }
 
             if (disabledFinalizar) {
               if (bloqueioChecklist) {
@@ -86,9 +109,9 @@ export function PedidoRow({
 
             onFinalizar();
           }}
-          disabled={disabledFinalizar}
+          disabled={disabled}
         >
-          Finalizar
+          {buttonLabel}
         </button>
       </td>
     </tr>

@@ -6,6 +6,7 @@ import Lottie from "lottie-react";
 
 import atencaoAnim from "../assets/lotties/atencao.json";
 
+
 function normalizeStatus(status: any): string {
   return String(status ?? "").trim().toUpperCase();
 }

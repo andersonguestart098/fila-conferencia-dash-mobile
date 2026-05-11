@@ -18,6 +18,7 @@ interface PedidoExpandidoProps {
   toggleItemChecked: (nunota: number, key: string) => void;
   marcarTodos: (nunota: number, itens: any[], value: boolean) => void;
   setQtdConferida: (nunota: number, key: string, value: number | "") => void;
+  conferenciaIniciada: boolean;
 }
 
 function formatQuantidadeVisual(valor: number, aceitaDecimal: boolean): string {
@@ -45,6 +46,7 @@ export function PedidoExpandido({
   toggleItemChecked,
   marcarTodos,
   setQtdConferida,
+  conferenciaIniciada,
 }: PedidoExpandidoProps) {
   const map = checkedByNunota[pedido.nunota] ?? {};
   const mapQtd = qtdByNunota[pedido.nunota] ?? {};
@@ -59,21 +61,31 @@ export function PedidoExpandido({
   }, 0);
 
   const estoqueOk = pedido.itens.reduce((acc, it) => {
-  const grupoLiberado = isGrupoLiberadoComExcecao(
-    (it as any).codGrupoProd,
-    (it as any).codProd
-  );
+    const grupoLiberado = isGrupoLiberadoComExcecao(
+      (it as any).codGrupoProd,
+      (it as any).codProd
+    );
 
-  if (grupoLiberado) return acc + 1;
-  return acc + (verificarEstoqueSuficiente(it) ? 1 : 0);
-}, 0);
+    if (grupoLiberado) return acc + 1;
+    return acc + (verificarEstoqueSuficiente(it) ? 1 : 0);
+  }, 0);
 
   return (
     <tr className="row-detail">
       <td colSpan={7}>
         <div className="detail-box">
-          <div className="detail-box-title" style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-            <div>Itens do pedido #{pedido.nunota}</div>
+          <div
+            className="detail-box-title"
+            style={{ display: "flex", justifyContent: "space-between", gap: 10 }}
+          >
+            <div>
+              Itens do pedido #{pedido.nunota}
+              {!conferenciaIniciada && (
+                <span style={{ marginLeft: 10, fontSize: 12, color: "#b91c1c", fontWeight: 900 }}>
+                  Clique em Iniciar para liberar a conferência
+                </span>
+              )}
+            </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontWeight: 900, opacity: 0.85 }}>
@@ -82,22 +94,42 @@ export function PedidoExpandido({
 
               <button
                 className="chip"
+                disabled={!conferenciaIniciada}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!conferenciaIniciada) return;
                   marcarTodos(pedido.nunota, pedido.itens, true);
                 }}
-                title="Marcar todos (preenche qtd automaticamente)"
+                title={
+                  conferenciaIniciada
+                    ? "Marcar todos (preenche qtd automaticamente)"
+                    : "Inicie a conferência para liberar"
+                }
+                style={{
+                  opacity: conferenciaIniciada ? 1 : 0.45,
+                  cursor: conferenciaIniciada ? "pointer" : "not-allowed",
+                }}
               >
                 ✅ Tudo
               </button>
 
               <button
                 className="chip"
+                disabled={!conferenciaIniciada}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!conferenciaIniciada) return;
                   marcarTodos(pedido.nunota, pedido.itens, false);
                 }}
-                title="Desmarcar todos (limpa qtd)"
+                title={
+                  conferenciaIniciada
+                    ? "Desmarcar todos (limpa qtd)"
+                    : "Inicie a conferência para liberar"
+                }
+                style={{
+                  opacity: conferenciaIniciada ? 1 : 0.45,
+                  cursor: conferenciaIniciada ? "pointer" : "not-allowed",
+                }}
               >
                 ↩️ Limpar
               </button>
@@ -110,8 +142,8 @@ export function PedidoExpandido({
               const qtdNeg = getQtdPedidoItem(item);
 
               const grupoLiberado = isGrupoLiberadoComExcecao(
-                  (item as any).codGrupoProd,
-                  (item as any).codProd
+                (item as any).codGrupoProd,
+                (item as any).codProd
               );
               const aceitaDecimal = aceitaDecimalPorProduto((item as any).codProd);
 
@@ -147,8 +179,13 @@ export function PedidoExpandido({
               return (
                 <div
                   key={`${(item as any).codProd}-${idx}`}
-                  className={`detail-item ${checked ? "detail-item-checked" : ""} ${showMismatch ? "detail-item-mismatch" : ""} ${showEstoqueError ? "detail-item-estoque-error" : ""}`}
+                  className={`detail-item ${checked ? "detail-item-checked" : ""} ${
+                    showMismatch ? "detail-item-mismatch" : ""
+                  } ${showEstoqueError ? "detail-item-estoque-error" : ""}`}
                   onClick={(e) => e.stopPropagation()}
+                  style={{
+                    opacity: conferenciaIniciada ? 1 : 0.72,
+                  }}
                 >
                   <div className="item-row">
                     <div className="item-info">
@@ -217,13 +254,18 @@ export function PedidoExpandido({
                       <div className="qtd-label">Qtd conf.</div>
 
                       <input
-                        className={`qtd-input ${showMismatch ? "qtd-input-error" : ""} ${showEstoqueError ? "qtd-input-estoque-error" : ""}`}
+                        className={`qtd-input ${showMismatch ? "qtd-input-error" : ""} ${
+                          showEstoqueError ? "qtd-input-estoque-error" : ""
+                        }`}
                         inputMode={aceitaDecimal ? "decimal" : "numeric"}
                         type="number"
                         min={0}
                         step={aceitaDecimal ? 0.001 : 1}
                         value={digitadaRaw === "" ? "" : Number(digitadaRaw)}
+                        disabled={!conferenciaIniciada}
                         onChange={(e) => {
+                          if (!conferenciaIniciada) return;
+
                           const v = e.target.value;
 
                           if (v === "") return setQtdConferida(pedido.nunota, key, "");
@@ -240,8 +282,16 @@ export function PedidoExpandido({
 
                           setQtdConferida(pedido.nunota, key, Math.max(0, Math.floor(cleaned)));
                         }}
-                        placeholder="digite"
-                        title="Digite a quantidade conferida"
+                        placeholder={conferenciaIniciada ? "digite" : "bloqueado"}
+                        title={
+                          conferenciaIniciada
+                            ? "Digite a quantidade conferida"
+                            : "Inicie a conferência para digitar"
+                        }
+                        style={{
+                          cursor: conferenciaIniciada ? "text" : "not-allowed",
+                          opacity: conferenciaIniciada ? 1 : 0.55,
+                        }}
                       />
 
                       <div className={`qtd-hint ${match ? "qtd-hint-ok" : "qtd-hint-bad"}`}>
@@ -252,9 +302,23 @@ export function PedidoExpandido({
                     <button
                       type="button"
                       className={`circle-check ${checked ? "circle-check-on" : ""}`}
-                      onClick={() => toggleItemChecked(pedido.nunota, key)}
-                      title={checked ? "Desmarcar" : "Marcar como conferido"}
+                      disabled={!conferenciaIniciada}
+                      onClick={() => {
+                        if (!conferenciaIniciada) return;
+                        toggleItemChecked(pedido.nunota, key);
+                      }}
+                      title={
+                        conferenciaIniciada
+                          ? checked
+                            ? "Desmarcar"
+                            : "Marcar como conferido"
+                          : "Inicie a conferência para marcar"
+                      }
                       aria-pressed={checked}
+                      style={{
+                        cursor: conferenciaIniciada ? "pointer" : "not-allowed",
+                        opacity: conferenciaIniciada ? 1 : 0.45,
+                      }}
                     >
                       {checked ? <span className="circle-check-v">V</span> : null}
                     </button>

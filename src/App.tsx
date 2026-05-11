@@ -1,6 +1,7 @@
-// src/App.tsx
+import { useEffect } from "react";
 import "./App.css";
 import { useFilaConferencia } from "./hooks/useFilaConferencia";
+import { conectarConferenciaStream } from "./api/conferenciaStream";
 import { PedidoTable } from "./components/PedidoTable";
 import {
   AUDIO_INSTANCE_ID,
@@ -11,18 +12,50 @@ import {
 import logoCemear from "./assets/logo.png";
 
 function App() {
-  const { pedidos, loadingInicial, erro, selecionado, setSelecionado } =
-    useFilaConferencia();
+  const {
+    pedidos,
+    loadingInicial,
+    erro,
+    selecionado,
+    setSelecionado,
+    refresh,
+  } = useFilaConferencia();
+
+  useEffect(() => {
+    console.log("🚀 [APP] iniciando conexão SSE");
+
+    const disconnect = conectarConferenciaStream({
+      onConnected: () => {
+        console.log("✅ [APP] SSE conectado");
+      },
+
+      onPedidoStatusChanged: (event) => {
+        console.log("📩 [APP] pedido_status_changed recebido", event);
+        refresh();
+      },
+
+      onPedidoFinalizado: (event) => {
+        console.log("📩 [APP] pedido_finalizado recebido", event);
+        refresh();
+      },
+
+      onError: (error) => {
+        console.warn("⚠️ [APP] erro SSE", error);
+      },
+    });
+
+    return () => {
+      console.log("🔌 [APP] encerrando SSE");
+      disconnect();
+    };
+  }, [refresh]);
 
   return (
     <div className="app-root">
-      {/* ✅ NAVBAR novo estilo (sem filtros/busca/avatar) */}
       <header className="cemear-navbar">
         <div className="cemear-navbar-inner">
-          {/* Linha superior */}
           <div className="cemear-navbar-top">
             <div className="cemear-navbar-left">
-
               <div className="cemear-title-wrap">
                 <div className="cemear-title">Fila de Conferência</div>
                 <div className="cemear-subtitle">
@@ -38,7 +71,6 @@ function App() {
             </div>
           </div>
 
-          {/* Linha inferior (mantém o que você já tinha) */}
           <div className="cemear-navbar-bottom">
             <div className="cemear-actions-left">
               <span className="cemear-pill">Pedidos: {pedidos.length}</span>
@@ -79,12 +111,11 @@ function App() {
             erro={erro}
             selecionado={selecionado}
             onSelect={setSelecionado}
-            // onRefresh={refetch}
+            onRefresh={refresh}
           />
         </section>
       </main>
 
-      {/* ✅ CSS do navbar embutido (se preferir, eu movo pro App.css) */}
       <style>{`
         .cemear-navbar{
           position: sticky;
@@ -115,19 +146,6 @@ function App() {
           gap: 12px;
           min-width: 260px;
           flex: 1;
-        }
-
-        .cemear-backicon{
-          width: 44px;
-          height: 44px;
-          border-radius: 14px;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          color: #fff;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.10);
-          backdrop-filter: blur(10px);
         }
 
         .cemear-title-wrap{

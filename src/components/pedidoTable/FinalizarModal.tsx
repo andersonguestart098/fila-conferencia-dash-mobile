@@ -8,12 +8,14 @@ interface FinalizarModalProps {
   pedido: DetalhePedido | null;
   open: boolean;
   loading: boolean;
+  modo: "iniciar" | "finalizar";
   checklist: {
     ok: boolean;
     done: number;
     okQty: number;
     estoqueOk: number;
   } | null;
+  conferenteAtual?: Conferente | null;
   conferenteId: number | "";
   setConferenteId: (v: number | "") => void;
   onClose: () => void;
@@ -54,7 +56,9 @@ export function FinalizarModal({
   pedido,
   open,
   loading,
+  modo,
   checklist,
+  conferenteAtual,
   conferenteId,
   setConferenteId,
   onClose,
@@ -62,7 +66,9 @@ export function FinalizarModal({
 }: FinalizarModalProps) {
   if (!open || !pedido || !checklist) return null;
 
-  const canConfirm = checklist.ok;
+  const isIniciar = modo === "iniciar";
+  const canConfirm = isIniciar || checklist.ok;
+  const canConfirmFinalizar = !isIniciar && canConfirm && !!conferenteAtual?.codUsuario;
 
   return (
     <Portal>
@@ -87,7 +93,10 @@ export function FinalizarModal({
             }}
           >
             <div>
-              <div style={{ fontWeight: 1000, fontSize: 20 }}>Finalizar conferência</div>
+              <div style={{ fontWeight: 1000, fontSize: 20 }}>
+                {isIniciar ? "Iniciar conferência" : "Confirmar finalização"}
+              </div>
+
               <div style={{ marginTop: 4, fontSize: 13, opacity: 0.8, fontWeight: 700 }}>
                 Pedido <b>#{pedido.nunota}</b>
                 {pedido.numNota ? (
@@ -98,14 +107,22 @@ export function FinalizarModal({
                 ) : null}
               </div>
 
-              {!canConfirm && (
+              {!isIniciar && !checklist.ok && (
                 <div style={{ marginTop: 8, fontSize: 12, fontWeight: 900, color: "#b91c1c" }}>
                   ⚠️ Para finalizar: marque TODOS os itens, DIGITE a quantidade conferida e valide o estoque dos itens fora do grupo 10.
                 </div>
               )}
 
-              <div style={{ marginTop: 8, fontSize: 12, fontWeight: 1000, color: "#b91c1c" }}>
-                REALIZAR CORTE PELO SANKHYA!
+              {!isIniciar && !conferenteAtual?.codUsuario && (
+                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 900, color: "#b91c1c" }}>
+                  ⚠️ Conferente não encontrado. Inicie a conferência novamente.
+                </div>
+              )}
+
+              <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12 }}>
+                {isIniciar
+                  ? "Ao confirmar, vamos definir o conferente e iniciar a conferência para garantir o NUCONF."
+                  : "Revise o resumo abaixo e confirme a finalização da conferência."}
               </div>
             </div>
 
@@ -132,8 +149,6 @@ export function FinalizarModal({
           </div>
 
           <div style={{ padding: "16px 18px 18px 18px" }}>
-            <div style={{ fontWeight: 900, marginBottom: 10 }}>Selecionar conferente</div>
-
             <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 14 }}>
               <div
                 style={{
@@ -143,30 +158,50 @@ export function FinalizarModal({
                   background: "rgba(0,0,0,0.015)",
                 }}
               >
-                <div style={{ fontSize: 12, fontWeight: 900, opacity: 0.75, marginBottom: 8 }}>Conferente</div>
-
-                <select
-                  className="select"
-                  value={conferenteId}
-                  onChange={(e) => {
-                    const cod = Number(e.target.value || 0);
-                    const found = CONFERENTES.find((c) => c.codUsuario === cod) || null;
-                    setConferenteId(found?.codUsuario ?? "");
-                  }}
-                  style={{ width: "100%" }}
-                  disabled={loading}
-                >
-                  <option value="">Escolha…</option>
-                  {CONFERENTES.map((c) => (
-                    <option key={c.codUsuario} value={c.codUsuario}>
-                      {c.nome}
-                    </option>
-                  ))}
-                </select>
-
-                <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12 }}>
-                  Ao confirmar, vamos definir o conferente e finalizar a conferência.
+                <div style={{ fontWeight: 1000, marginBottom: 10 }}>
+                  {isIniciar ? "Selecionar conferente" : "Conferente definido"}
                 </div>
+
+                {isIniciar ? (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 900, opacity: 0.75, marginBottom: 8 }}>
+                      Conferente
+                    </div>
+
+                    <select
+                      className="select"
+                      value={conferenteId}
+                      onChange={(e) => {
+                        const cod = Number(e.target.value || 0);
+                        const found = CONFERENTES.find((c) => c.codUsuario === cod) || null;
+                        setConferenteId(found?.codUsuario ?? "");
+                      }}
+                      style={{ width: "100%" }}
+                      disabled={loading}
+                    >
+                      <option value="">Escolha…</option>
+                      {CONFERENTES.map((c) => (
+                        <option key={c.codUsuario} value={c.codUsuario}>
+                          {c.nome}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12 }}>
+                      Essa ação define o conferente, inicia a conferência no Sankhya e salva o NUCONF localmente.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 22, fontWeight: 1000 }}>
+                      {conferenteAtual?.nome ?? "(não encontrado)"}
+                    </div>
+
+                    <div style={{ marginTop: 8, opacity: 0.75, fontSize: 12 }}>
+                      O conferente foi definido no momento em que a conferência foi iniciada.
+                    </div>
+                  </>
+                )}
               </div>
 
               <div
@@ -183,10 +218,12 @@ export function FinalizarModal({
                   <span style={{ opacity: 0.8 }}>Cliente</span>
                   <b>{pedido.nomeParc ?? "-"}</b>
                 </div>
+
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0" }}>
                   <span style={{ opacity: 0.8 }}>Vendedor</span>
                   <b>{pedido.nomeVendedor ?? "-"}</b>
                 </div>
+
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0" }}>
                   <span style={{ opacity: 0.8 }}>Itens</span>
                   <b>{pedido.itens?.length ?? 0}</b>
@@ -218,19 +255,33 @@ export function FinalizarModal({
             <button
               className="chip chip-active"
               onClick={() => {
-                const cod = Number(conferenteId || 0);
-                const found = CONFERENTES.find((c) => c.codUsuario === cod) || null;
+                if (isIniciar) {
+                  const cod = Number(conferenteId || 0);
+                  const found = CONFERENTES.find((c) => c.codUsuario === cod) || null;
 
-                if (!found) return alert("Selecione o conferente.");
+                  if (!found) return alert("Selecione o conferente.");
+
+                  onConfirm(found);
+                  return;
+                }
+
+                if (!conferenteAtual?.codUsuario) {
+                  return alert("Conferente não encontrado. Inicie a conferência novamente.");
+                }
+
                 if (!canConfirm) {
                   return alert(
                     "Checklist incompleto: marque todos os itens, digite a quantidade conferida e valide o estoque dos itens fora do grupo 10."
                   );
                 }
 
-                onConfirm(found);
+                onConfirm(conferenteAtual);
               }}
-              disabled={loading || !canConfirm || !(Number(conferenteId || 0) > 0)}
+              disabled={
+                loading ||
+                (isIniciar && !(Number(conferenteId || 0) > 0)) ||
+                (!isIniciar && !canConfirmFinalizar)
+              }
               style={{
                 minWidth: 260,
                 display: "inline-flex",
@@ -243,10 +294,12 @@ export function FinalizarModal({
               {loading ? (
                 <>
                   <span style={spinnerWhite} />
-                  Finalizando...
+                  {isIniciar ? "Iniciando..." : "Finalizando..."}
                 </>
+              ) : isIniciar ? (
+                "Confirmar e iniciar"
               ) : (
-                "Confirmar e finalizar"
+                "Confirmar finalização"
               )}
             </button>
           </div>

@@ -63,7 +63,10 @@ export function usePedidoActions({
     return res.data;
   }
 
-  async function iniciarEObterNuconf(nunotaOrig: number, codUsuario: number): Promise<number> {
+  async function iniciarEObterNuconf(
+    nunotaOrig: number,
+    codUsuario: number
+  ): Promise<number> {
     const payload = {
       nunotaOrig: Number(nunotaOrig),
       codUsuario: Number(codUsuario),
@@ -87,9 +90,14 @@ export function usePedidoActions({
     return nuconf;
   }
 
-  async function finalizarConferenciaViaBackend(nuconf: number, codUsuario: number) {
+  async function finalizarConferenciaViaBackend(
+    nuconf: number,
+    nunotaOrig: number,
+    codUsuario: number
+  ) {
     const payload = {
       nuconf: Number(nuconf),
+      nunotaOrig: Number(nunotaOrig),
       codUsuario: Number(codUsuario),
     };
 
@@ -99,6 +107,7 @@ export function usePedidoActions({
 
     console.log("✅ [CONFERENCIA] finalizar OK", {
       nuconf,
+      nunotaOrig,
       response: res.data,
     });
 
@@ -113,77 +122,97 @@ export function usePedidoActions({
     return Number(nuconfByNunota[nunota] ?? 0);
   }
 
-  function podeIniciarPeloStatus(p: DetalhePedido): boolean {
+  function salvarNuconfLocal(nunota: number, nuconf: number) {
+    setNuconfByNunota((prev) => {
+      const next = { ...prev, [nunota]: nuconf };
+      saveNuconfByNunota(next);
+      return next;
+    });
+  }
+
+  async function iniciarConferenciaPedido(p: DetalhePedido, conf: Conferente) {
+    setLoadingConfirmacao(p.nunota);
+
+    try {
+      const nunota = Number(p.nunota);
+      const codUsuario = Number(conf.codUsuario);
+      const status = normalizeStatus((p as any).statusConferencia);
+
+      if (!Number.isFinite(codUsuario) || codUsuario <= 0) {
+        throw new Error("Conferente inválido.");
+      }
+
+      const nuconfPayload = getNuconfDoPayload(p);
+      const nuconfCache = getNuconfDoCache(nunota);
+
+      if (nuconfPayload > 0 || nuconfCache > 0 || status === "A") {
+        const nuconfExistente = nuconfPayload || nuconfCache;
+
+        console.log("ℹ️ [CONFERENCIA] pedido já iniciado", {
+          nunota,
+          status,
+          nuconf: nuconfExistente,
+        });
+
+        if (nuconfExistente > 0) {
+          salvarNuconfLocal(nunota, nuconfExistente);
+        }
+
+        return nuconfExistente;
+      }
+
+      setConferenteByNunota((prev) => {
+        const next = { ...prev, [nunota]: { ...conf, codUsuario } };
+        saveConferenteByNunota(next);
+        return next;
+      });
+
+      await definirConferenteNoBackend(nunota, { ...conf, codUsuario });
+
+      const nuconfNovo = await iniciarEObterNuconf(nunota, codUsuario);
+
+      salvarNuconfLocal(nunota, nuconfNovo);
+
+      console.log("✅ [CONFERENCIA] conferência iniciada com sucesso", {
+        nunota,
+        nuconf: nuconfNovo,
+        conferente: conf.nome,
+      });
+
+      if (onRefresh) onRefresh();
+
+      return nuconfNovo;
+    } catch (err: any) {
+      console.error("❌ [CONFERENCIA] erro ao iniciar", {
+        nunota: p.nunota,
+        status: (p as any).statusConferencia,
+        nuconfPayload: (p as any).nuconf,
+        nuconfCache: nuconfByNunota[p.nunota],
+        message: err?.message,
+        responseStatus: err?.response?.status,
+        responseData: err?.response?.data,
+      });
+
+      throw err;
+    } finally {
+      setLoadingConfirmacao(null);
+    }
+  }
+
+  async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<number> {
+    const nunota = Number(p.nunota);
     const status = normalizeStatus((p as any).statusConferencia);
-    return status === "A" || status === "AL";
+
+    const nuconfPayload = getNuconfDoPayload(p);
+    if (nuconfPayload > 0) return nuconfPayload;
+
+    const nuconfCache = getNuconfDoCache(nunota);
+    if (nuconfCache > 0) return nuconfCache;
+
+    throw new Error(
+      `Pedido #${nunota} ainda não foi iniciado. Clique em Iniciar antes de finalizar. Status atual: ${status || "(vazio)"}.`
+    );
   }
-
-async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<number> {
-  const nunota = Number(p.nunota);
-  const status = normalizeStatus((p as any).statusConferencia);
-
-  const nuconfPayload = getNuconfDoPayload(p);
-  if (nuconfPayload > 0) {
-    console.log("ℹ️ [CONFERENCIA] usando nuconf do payload", {
-      nunota,
-      status,
-      nuconf: nuconfPayload,
-    });
-    return nuconfPayload;
-  }
-
-  const nuconfCache = getNuconfDoCache(nunota);
-  if (nuconfCache > 0) {
-    console.log("ℹ️ [CONFERENCIA] usando nuconf do cache", {
-      nunota,
-      status,
-      nuconf: nuconfCache,
-    });
-    return nuconfCache;
-  }
-
-  if (podeIniciarPeloStatus(p)) {
-    console.log("ℹ️ [CONFERENCIA] sem nuconf, iniciando conferência", {
-      nunota,
-      status,
-      codUsuario,
-    });
-
-    const nuconfNovo = await iniciarEObterNuconf(nunota, codUsuario);
-
-    setNuconfByNunota((prev) => {
-      const next = { ...prev, [nunota]: nuconfNovo };
-      saveNuconfByNunota(next);
-      return next;
-    });
-
-    return nuconfNovo;
-  }
-
-  if (status === "AC") {
-    console.warn("⚠️ [CONFERENCIA] AC sem nuconf → tratando como A e iniciando nova conferência", {
-      nunota,
-      status,
-      codUsuario,
-      nuconfPayload,
-      nuconfCache,
-    });
-
-    const nuconfNovo = await iniciarEObterNuconf(nunota, codUsuario);
-
-    setNuconfByNunota((prev) => {
-      const next = { ...prev, [nunota]: nuconfNovo };
-      saveNuconfByNunota(next);
-      return next;
-    });
-
-    return nuconfNovo;
-  }
-
-  throw new Error(
-    `Não foi possível garantir NUCONF para o pedido #${nunota}. Status atual: ${status || "(vazio)"}.`
-  );
-}
 
   async function confirmarConferenteEFinalizar(p: DetalhePedido, conf: Conferente) {
     setLoadingConfirmacao(p.nunota);
@@ -197,7 +226,7 @@ async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<num
         throw new Error("Conferente inválido.");
       }
 
-      console.log("🚀 [CONFERENCIA] iniciar fluxo de confirmação/finalização", {
+      console.log("🚀 [CONFERENCIA] iniciar fluxo de finalização", {
         nunota,
         status,
         conferente: {
@@ -218,7 +247,7 @@ async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<num
 
       const nuconf = await garantirNuconf(p, codUsuario);
 
-      await finalizarConferenciaViaBackend(nuconf, codUsuario);
+      await finalizarConferenciaViaBackend(nuconf, nunota, codUsuario);
 
       marcarOptimisticFinal(nunota);
 
@@ -251,6 +280,7 @@ async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<num
     loadingConfirmacao,
     successModal,
     setSuccessModal,
+    iniciarConferenciaPedido,
     confirmarConferenteEFinalizar,
   };
 }
