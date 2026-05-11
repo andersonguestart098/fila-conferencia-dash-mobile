@@ -199,7 +199,7 @@ export function usePedidoActions({
     }
   }
 
-  async function garantirNuconf(p: DetalhePedido, codUsuario: number): Promise<number> {
+  async function garantirNuconf(p: DetalhePedido): Promise<number> {
     const nunota = Number(p.nunota);
     const status = normalizeStatus((p as any).statusConferencia);
 
@@ -245,7 +245,7 @@ export function usePedidoActions({
 
       await definirConferenteNoBackend(nunota, { ...conf, codUsuario });
 
-      const nuconf = await garantirNuconf(p, codUsuario);
+      const nuconf = await garantirNuconf(p);
 
       await finalizarConferenciaViaBackend(nuconf, nunota, codUsuario);
 
