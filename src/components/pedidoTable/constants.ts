@@ -38,6 +38,7 @@ export const CONFERENTES: Conferente[] = [
   { codUsuario: 8, nome: "Everton" },
   { codUsuario: 9, nome: "Maximiliano" },
   { codUsuario: 10, nome: "Miqueias" },
+  { codUsuario: 11, nome: "Marcelo" },
 ];
 
 export const FINAL_OK_COLORS = {
