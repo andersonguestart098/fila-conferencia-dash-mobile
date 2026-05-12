@@ -1,4 +1,3 @@
-// src/hooks/useFilaConferencia.ts
 import { useCallback, useEffect, useState } from "react";
 import type { DetalhePedido } from "../types/conferencia";
 import { buscarPedidosPendentes } from "../api/conferencia";
@@ -15,6 +14,11 @@ interface UseFilaConferenciaResult {
   selecionado: DetalhePedido | null;
   setSelecionado: (p: DetalhePedido | null) => void;
   refresh: () => Promise<void>;
+  aplicarStatusLocal: (
+    nunota: number,
+    statusConferencia: string,
+    nuconf?: number | null
+  ) => void;
 }
 
 export function useFilaConferencia(): UseFilaConferenciaResult {
@@ -22,6 +26,39 @@ export function useFilaConferencia(): UseFilaConferenciaResult {
   const [loadingInicial, setLoadingInicial] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [selecionado, setSelecionado] = useState<DetalhePedido | null>(null);
+
+  const aplicarStatusLocal = useCallback(
+    (nunota: number, statusConferencia: string, nuconf?: number | null) => {
+      console.log("⚡ [LOCAL_STATUS_UPDATE]", {
+        nunota,
+        statusConferencia,
+        nuconf,
+      });
+
+      setPedidos((prev) =>
+        prev.map((p) => {
+          if (Number(p.nunota) !== Number(nunota)) return p;
+
+          return {
+            ...p,
+            statusConferencia,
+            nuconf: nuconf && nuconf > 0 ? nuconf : (p as any).nuconf,
+          } as DetalhePedido;
+        })
+      );
+
+      setSelecionado((atual) => {
+        if (!atual || Number(atual.nunota) !== Number(nunota)) return atual;
+
+        return {
+          ...atual,
+          statusConferencia,
+          nuconf: nuconf && nuconf > 0 ? nuconf : (atual as any).nuconf,
+        } as DetalhePedido;
+      });
+    },
+    []
+  );
 
   const carregar = useCallback(async () => {
     try {
@@ -78,5 +115,6 @@ export function useFilaConferencia(): UseFilaConferenciaResult {
     selecionado,
     setSelecionado,
     refresh: carregar,
+    aplicarStatusLocal,
   };
 }

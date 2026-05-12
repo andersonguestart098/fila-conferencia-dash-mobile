@@ -210,8 +210,73 @@ export function PedidoTable({
     return getConferenteExibicao(pedidoModal);
   }, [pedidoModal, conferenteByNunota]);
 
-  if (loadingInicial && pedidos.length === 0) return <div className="center">Carregando…</div>;
-  if (erro && pedidos.length === 0) return <div className="center">{erro}</div>;
+  if (loadingInicial && pedidos.length === 0) {
+  return (
+    <div
+      className="center"
+      style={{
+        minHeight: "70vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        gap: 18,
+      }}
+    >
+      <div
+        style={{
+          width: 64,
+          height: 64,
+          border: "6px solid rgba(193, 201, 214, 0.18)",
+          borderTop: "6px solid #C1C9D6",
+          borderRadius: "50%",
+          animation: "spin 0.9s linear infinite",
+        }}
+      />
+
+      <div
+        style={{
+          color: "#C1C9D6",
+          fontWeight: 800,
+          fontSize: 16,
+          letterSpacing: 0.3,
+        }}
+      >
+        Carregando pedidos...
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+if (erro && pedidos.length === 0) {
+  return (
+    <div
+      className="center"
+      style={{
+        minHeight: "70vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#C1C9D6",
+        fontWeight: 700,
+        fontSize: 16,
+      }}
+    >
+      {erro}
+    </div>
+  );
+}
 
   return (
     <div>

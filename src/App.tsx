@@ -19,6 +19,7 @@ function App() {
     selecionado,
     setSelecionado,
     refresh,
+    aplicarStatusLocal
   } = useFilaConferencia();
 
   useEffect(() => {
@@ -31,13 +32,31 @@ function App() {
 
       onPedidoStatusChanged: (event) => {
         console.log("📩 [APP] pedido_status_changed recebido", event);
-        refresh();
+
+        aplicarStatusLocal(
+          event.nunota,
+          event.statusConferencia,
+          (event as any).nuconf
+        );
+
+        setTimeout(() => {
+          refresh();
+        }, 800);
       },
 
       onPedidoFinalizado: (event) => {
-        console.log("📩 [APP] pedido_finalizado recebido", event);
+      console.log("📩 [APP] pedido_finalizado recebido", event);
+
+      aplicarStatusLocal(
+        event.nunota,
+        event.statusConferencia,
+        event.nuconf
+      );
+
+      setTimeout(() => {
         refresh();
-      },
+      }, 800);
+    },
 
       onError: (error) => {
         console.warn("⚠️ [APP] erro SSE", error);
