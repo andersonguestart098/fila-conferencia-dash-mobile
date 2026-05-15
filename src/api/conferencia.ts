@@ -85,6 +85,8 @@ function sincronizarConferentesLocais(pedidos: DetalhePedido[]) {
     { codUsuario: 7, nome: "Eduardo" },
     { codUsuario: 8, nome: "Everton" },
     { codUsuario: 9, nome: "Maximiliano" },
+    { codUsuario: 10, nome: "Miqueias" },
+    { codUsuario: 11, nome: "Marcelo" },
   ];
 
   pedidos.forEach((pedido) => {
@@ -242,6 +244,8 @@ export async function buscarConferentesDoBackend(): Promise<
     { codUsuario: 7, nome: "Eduardo" },
     { codUsuario: 8, nome: "Everton" },
     { codUsuario: 9, nome: "Maximiliano" },
+    { codUsuario: 10, nome: "Miqueias" },
+    { codUsuario: 11, nome: "Marcelo" },
   ];
 }
 

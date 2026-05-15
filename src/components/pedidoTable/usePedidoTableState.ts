@@ -26,6 +26,10 @@ export function usePedidoTableState(pedidos: DetalhePedido[]) {
   const [somAlertaDesativado, setSomAlertaDesativado] = useState(false);
 
   const [conferenteByNunota, setConferenteByNunota] = useState<ConferenteByNunota>(() => loadConferenteByNunota());
+
+  useEffect(() => {
+    setConferenteByNunota(loadConferenteByNunota());
+  }, [pedidos]);
   const [nuconfByNunota, setNuconfByNunota] = useState<NuconfByNunota>(() => loadNuconfByNunota());
   const [optimisticFinalizedByNunota, setOptimisticFinalizedByNunota] =
     useState<OptimisticFinalizedByNunota>(() => loadOptimisticFinalized());
