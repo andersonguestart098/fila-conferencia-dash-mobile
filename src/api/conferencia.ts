@@ -149,7 +149,7 @@ export async function buscarPedidosPendentes(): Promise<DetalhePedido[] | null> 
 
   pendentesEmAndamento = (async () => {
     try {
-      const url = "/api/conferencia/pedidos-pendentes";
+      const url = "/api/conferencia/fila-db";
 
       apiLog("📡 [API] Buscando pedidos pendentes sob demanda...");
 
@@ -247,6 +247,47 @@ export async function buscarConferentesDoBackend(): Promise<
     { codUsuario: 10, nome: "Miqueias" },
     { codUsuario: 11, nome: "Marcelo" },
   ];
+}
+
+let filaDbEmAndamento: Promise<DetalhePedido[] | null> | null = null;
+
+export async function buscarFilaDb(): Promise<DetalhePedido[] | null> {
+  if (filaDbEmAndamento) {
+    apiLog("🟦 [API] buscarFilaDb reaproveitada: já existe request em andamento.");
+    return filaDbEmAndamento;
+  }
+
+  filaDbEmAndamento = (async () => {
+    try {
+      apiLog("📡 [API] Buscando fila-db...");
+
+      const data = await getComRetry<DetalhePedido[]>(
+        "/api/conferencia/fila-db",
+        { timeout: 60000 },
+        1
+      );
+
+      if (!Array.isArray(data)) {
+        console.warn("⚠ [API] fila-db retornou formato inesperado", data);
+        return [];
+      }
+
+      apiLog("✅ [API] fila-db recebida", { total: data.length });
+      sincronizarConferentesLocais(data);
+      return data;
+    } catch (error: any) {
+      console.error("❌ [API] ERRO ao buscar fila-db:", {
+        message: error?.message,
+        code: error?.code,
+        status: error?.response?.status,
+      });
+      return null;
+    } finally {
+      filaDbEmAndamento = null;
+    }
+  })();
+
+  return filaDbEmAndamento;
 }
 
 export { loadConferenteByNunota, saveConferenteByNunota };

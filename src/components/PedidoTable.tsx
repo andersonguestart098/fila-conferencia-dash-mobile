@@ -311,7 +311,15 @@ if (erro && pedidos.length === 0) {
                 return;
               }
 
-              await iniciarConferenciaPedido(pedidoModal, conf);
+              const jaIniciado =
+                Number((pedidoModal as any).nuconf ?? 0) > 0 ||
+                Number(nuconfByNunota[pedidoModal.nunota] ?? 0) > 0;
+
+              if (jaIniciado) {
+                await confirmarConferenteEFinalizar(pedidoModal, conf);
+              } else {
+                await iniciarConferenciaPedido(pedidoModal, conf);
+              }
             } else {
               const confAtual = getConferenteExibicao(pedidoModal);
 
@@ -399,6 +407,7 @@ if (erro && pedidos.length === 0) {
               const alerta5min = statusCode === "AC" && elapsedMin >= 5 && !isOptimisticFinal(p.nunota);
 
               const confExibicao = getConferenteExibicao(p);
+              const semConferente = !confExibicao?.nome;
 
               const nomeConferenteTexto =
                 (p as any).conferenteNome ??
@@ -418,7 +427,7 @@ if (erro && pedidos.length === 0) {
               const disabledIniciar =
                 isLoadingThis ||
                 visual.isFinalOk ||
-                statusCode !== "AC";
+                (!semConferente && statusCode !== "AC");
 
               const motivoBloqueio = {
                 statusInvalido: !podeFinalizarAgora,
@@ -428,12 +437,13 @@ if (erro && pedidos.length === 0) {
                 checklistInvalido: bloqueioChecklist,
               };
 
-              const disabledFinalizar =
-                motivoBloqueio.statusInvalido ||
-                motivoBloqueio.jaFinalizado ||
-                motivoBloqueio.carregando ||
-                motivoBloqueio.naoIniciada ||
-                motivoBloqueio.checklistInvalido;
+              const disabledFinalizar = semConferente
+                ? (isLoadingThis || visual.isFinalOk || bloqueioChecklist)
+                : (motivoBloqueio.statusInvalido ||
+                   motivoBloqueio.jaFinalizado ||
+                   motivoBloqueio.carregando ||
+                   motivoBloqueio.naoIniciada ||
+                   motivoBloqueio.checklistInvalido);
 
               return (
                 <React.Fragment key={p.nunota}>
@@ -460,7 +470,7 @@ if (erro && pedidos.length === 0) {
                       setFinalizarConferenteId((confExibicao?.codUsuario ?? "") as any);
                     }}
                     onFinalizar={() => {
-                      setModalModo("finalizar");
+                      setModalModo(semConferente ? "iniciar" : "finalizar");
                       setFinalizarNunotaOpen(p.nunota);
                       setFinalizarConferenteId((confExibicao?.codUsuario ?? "") as any);
                     }}

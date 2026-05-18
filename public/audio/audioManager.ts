@@ -73,8 +73,25 @@ export class AudioLogger {
   }
 }
 
+const PLAYED_STORAGE_KEY = "audioPlayedNunotas";
+
+function loadPlayedNunotas(): Set<number> {
+  try {
+    const raw = localStorage.getItem(PLAYED_STORAGE_KEY);
+    return raw ? new Set<number>(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function savePlayedNunotas() {
+  try {
+    localStorage.setItem(PLAYED_STORAGE_KEY, JSON.stringify(Array.from(playedNunotas)));
+  } catch {}
+}
+
 const queueNunotas = new Set<number>();
-const playedNunotas = new Set<number>();
+const playedNunotas: Set<number> = loadPlayedNunotas();
 
 let audioLock = false;
 let audioQueue: Array<{ src: string; nunota: number; nomeVendedor: string }> = [];
@@ -137,6 +154,7 @@ function processarFilaAudio() {
       });
 
       playedNunotas.add(proximo.nunota);
+      savePlayedNunotas();
       queueNunotas.delete(proximo.nunota);
 
       audioLock = false;
@@ -232,6 +250,20 @@ export function tocarAlertaCorte(
 }
 
 export function dispararAlertasVoz(lista: DetalhePedido[]) {
+  // Remove do set os pedidos que já saíram do status "C".
+  // Isso garante que se um pedido voltar a "C" no futuro, o áudio toca de novo.
+  const nunotasEmC = new Set(
+    lista.filter((p) => p.statusConferencia === "C").map((p) => Number(p.nunota))
+  );
+  let limpou = false;
+  for (const nunota of Array.from(playedNunotas)) {
+    if (!nunotasEmC.has(nunota)) {
+      playedNunotas.delete(nunota);
+      limpou = true;
+    }
+  }
+  if (limpou) savePlayedNunotas();
+
   for (const p of lista) {
     const estaAguardandoLiberacaoParaCorte = p.statusConferencia === "C";
     const jaTocou = playedNunotas.has(p.nunota);
@@ -271,6 +303,7 @@ export function limparTudoAudio() {
     )
   ) {
     playedNunotas.clear();
+    savePlayedNunotas();
     queueNunotas.clear();
     limparFilaAudio();
     alert("Fila e estado de áudio limpos com sucesso!");
