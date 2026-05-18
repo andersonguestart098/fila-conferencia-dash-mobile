@@ -235,6 +235,8 @@ export function tocarAlertaCorte(
   });
 
   queueNunotas.add(nunota);
+  playedNunotas.add(nunota);
+  savePlayedNunotas();
 
   audioQueue.push({
     src,
@@ -250,20 +252,6 @@ export function tocarAlertaCorte(
 }
 
 export function dispararAlertasVoz(lista: DetalhePedido[]) {
-  // Remove do set os pedidos que já saíram do status "C".
-  // Isso garante que se um pedido voltar a "C" no futuro, o áudio toca de novo.
-  const nunotasEmC = new Set(
-    lista.filter((p) => p.statusConferencia === "C").map((p) => Number(p.nunota))
-  );
-  let limpou = false;
-  for (const nunota of Array.from(playedNunotas)) {
-    if (!nunotasEmC.has(nunota)) {
-      playedNunotas.delete(nunota);
-      limpou = true;
-    }
-  }
-  if (limpou) savePlayedNunotas();
-
   for (const p of lista) {
     const estaAguardandoLiberacaoParaCorte = p.statusConferencia === "C";
     const jaTocou = playedNunotas.has(p.nunota);
