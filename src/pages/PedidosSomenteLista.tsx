@@ -21,6 +21,11 @@ export default function PedidosSomenteLista() {
         console.log("📡 [PEDIDOS_SOMENTE_LISTA] SSE conectado");
       },
 
+      onReconnect: () => {
+        console.log("🔄 [PEDIDOS_SOMENTE_LISTA] SSE reconectado — fazendo refresh");
+        refresh();
+      },
+
       onPedidoStatusChanged: (event) => {
         console.log("📩 [PEDIDOS_SOMENTE_LISTA] pedido_status_changed recebido", event);
         refresh();

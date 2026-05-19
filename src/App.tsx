@@ -30,6 +30,11 @@ function App() {
         console.log("✅ [APP] SSE conectado");
       },
 
+      onReconnect: () => {
+        console.log("🔄 [APP] SSE reconectado — fazendo refresh");
+        refresh();
+      },
+
       onPedidoStatusChanged: (event) => {
         console.log("📩 [APP] pedido_status_changed recebido", event);
 
@@ -45,18 +50,18 @@ function App() {
       },
 
       onPedidoFinalizado: (event) => {
-      console.log("📩 [APP] pedido_finalizado recebido", event);
+        console.log("📩 [APP] pedido_finalizado recebido", event);
 
-      aplicarStatusLocal(
-        event.nunota,
-        event.statusConferencia,
-        event.nuconf
-      );
+        aplicarStatusLocal(
+          event.nunota,
+          event.statusConferencia,
+          event.nuconf
+        );
 
-      setTimeout(() => {
-        refresh();
-      }, 800);
-    },
+        setTimeout(() => {
+          refresh();
+        }, 800);
+      },
 
       onError: (error) => {
         console.warn("⚠️ [APP] erro SSE", error);
