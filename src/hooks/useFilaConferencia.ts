@@ -22,6 +22,7 @@ interface UseFilaConferenciaResult {
 }
 
 const STATUS_REMOVER = new Set(["EXCLUIDO"]);
+const POLLING_INTERVAL_MS = 30_000; // 30s — leve e silencioso
 
 export function useFilaConferencia(): UseFilaConferenciaResult {
   const [pedidos, setPedidos] = useState<DetalhePedido[]>([]);
@@ -32,6 +33,9 @@ export function useFilaConferencia(): UseFilaConferenciaResult {
   // NUNOTAs que o SSE já marcou para remover da fila.
   // Veto: mesmo que a API retorne o pedido, ele não volta.
   const removidosRef = useRef<Set<number>>(new Set());
+
+  // Controle do polling: evita chamadas simultâneas
+  const pollingEmAndamentoRef = useRef(false);
 
   const removerDaFila = useCallback((nunota: number) => {
     removidosRef.current.add(Number(nunota));
@@ -129,10 +133,34 @@ export function useFilaConferencia(): UseFilaConferenciaResult {
     }
   }, []);
 
+  // Carga inicial
   useEffect(() => {
     AudioLogger.log("INSTANCE_INIT", "Inicializando painel de áudio");
     carregar();
     return () => { limparFilaAudio(); };
+  }, [carregar]);
+
+  // Polling silencioso a cada 30s
+  // — não mostra loading, não interrompe o usuário
+  // — ignora se já tem uma chamada em andamento
+  useEffect(() => {
+    const id = setInterval(async () => {
+      if (pollingEmAndamentoRef.current) {
+        console.log("⏭️ [POLLING] chamada anterior ainda em andamento, pulando");
+        return;
+      }
+
+      pollingEmAndamentoRef.current = true;
+      console.log("🔁 [POLLING] refresh silencioso");
+
+      try {
+        await carregar();
+      } finally {
+        pollingEmAndamentoRef.current = false;
+      }
+    }, POLLING_INTERVAL_MS);
+
+    return () => clearInterval(id);
   }, [carregar]);
 
   return {
