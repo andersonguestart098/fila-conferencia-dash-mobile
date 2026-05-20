@@ -1,5 +1,5 @@
 import type { DetalhePedido } from "../../types/conferencia";
-import { formatElapsed } from "./helpers";
+import { formatElapsed, isGrupoConstrucaoSeco } from "./helpers";
 
 interface PedidoRowProps {
   pedido: DetalhePedido;
@@ -41,6 +41,15 @@ export function PedidoRow({
   const buttonLabel = conferenciaIniciada ? "Finalizar" : "Iniciar";
   const disabled = conferenciaIniciada ? disabledFinalizar : disabledIniciar;
 
+  const temEstoqueIndisponivel = pedido.itens.some(
+    (item) =>
+      !isGrupoConstrucaoSeco(item.codGrupoProd) &&
+      (
+        (item.estoqueBruto != null && item.estoqueBruto <= 0) ||
+        (item.estoqueDisponivel != null && item.estoqueDisponivel < 0)
+      )
+  );
+
   return (
     <tr
       className={`row ${isExpanded ? "row-expanded" : ""} ${alerta5min ? "row-pulse" : ""}`}
@@ -58,7 +67,14 @@ export function PedidoRow({
         <div style={{ opacity: 0.75, fontSize: 12 }}>{pedido.itens.length} itens</div>
       </td>
 
-      <td>{pedido.nomeParc ?? "-"}</td>
+      <td>
+        <div>{pedido.nomeParc ?? "-"}</div>
+        {temEstoqueIndisponivel && (
+          <div style={{ color: "#e53e3e", fontSize: 11, fontWeight: 700, marginTop: 2 }}>
+            Realizar corte pelo Sankhya
+          </div>
+        )}
+      </td>
       <td>{pedido.nomeVendedor ?? "-"}</td>
 
       <td>

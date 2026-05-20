@@ -19,6 +19,7 @@ interface PedidoExpandidoProps {
   marcarTodos: (nunota: number, itens: any[], value: boolean) => void;
   setQtdConferida: (nunota: number, key: string, value: number | "") => void;
   conferenciaIniciada: boolean;
+  onFinalizarForcado?: () => void;
 }
 
 function formatQuantidadeVisual(valor: number, aceitaDecimal: boolean): string {
@@ -47,6 +48,7 @@ export function PedidoExpandido({
   marcarTodos,
   setQtdConferida,
   conferenciaIniciada,
+  onFinalizarForcado,
 }: PedidoExpandidoProps) {
   const map = checkedByNunota[pedido.nunota] ?? {};
   const mapQtd = qtdByNunota[pedido.nunota] ?? {};
@@ -328,7 +330,14 @@ export function PedidoExpandido({
             })}
           </div>
 
-          <div style={{ opacity: 0.75, marginTop: 10, fontSize: 12 }}>
+          <div
+            style={{ opacity: 0.45, marginTop: 10, fontSize: 12, cursor: onFinalizarForcado ? "pointer" : "default", userSelect: "none" }}
+            onClick={(e) => {
+              if (!onFinalizarForcado) return;
+              e.stopPropagation();
+              onFinalizarForcado();
+            }}
+          >
             Checklist local (fica salvo neste PC)
           </div>
         </div>

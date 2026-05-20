@@ -109,6 +109,14 @@ function App() {
             <div className="cemear-actions-right">
               <button
                 className="cemear-btn"
+                onClick={() => window.open("/historico", "_blank")}
+                title="Ver histórico de conferências"
+              >
+                🕓 Histórico
+              </button>
+
+              <button
+                className="cemear-btn"
                 onClick={verificarEstadoFila}
                 title="Verificar fila e estado atual"
               >

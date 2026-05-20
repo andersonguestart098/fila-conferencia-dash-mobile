@@ -485,6 +485,11 @@ if (erro && pedidos.length === 0) {
                       marcarTodos={marcarTodos}
                       setQtdConferida={setQtdConferida}
                       conferenciaIniciada={conferenciaIniciada}
+                      onFinalizarForcado={conferenciaIniciada ? () => {
+                        setModalModo(semConferente ? "iniciar" : "finalizar");
+                        setFinalizarNunotaOpen(p.nunota);
+                        setFinalizarConferenteId((confExibicao?.codUsuario ?? "") as any);
+                      } : undefined}
                     />
                   )}
                 </React.Fragment>
