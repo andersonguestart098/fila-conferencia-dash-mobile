@@ -485,10 +485,18 @@ if (erro && pedidos.length === 0) {
                       marcarTodos={marcarTodos}
                       setQtdConferida={setQtdConferida}
                       conferenciaIniciada={conferenciaIniciada}
-                      onFinalizarForcado={conferenciaIniciada ? () => {
-                        setModalModo(semConferente ? "iniciar" : "finalizar");
-                        setFinalizarNunotaOpen(p.nunota);
-                        setFinalizarConferenteId((confExibicao?.codUsuario ?? "") as any);
+                      onFinalizarForcado={conferenciaIniciada && confExibicao ? async () => {
+                        try {
+                          await confirmarConferenteEFinalizar(p, confExibicao);
+                        } catch (error: any) {
+                          const mensagem =
+                            error?.response?.data?.message ||
+                            error?.response?.data?.mensagem ||
+                            error?.response?.data?.error ||
+                            error?.message ||
+                            "Não foi possível finalizar.";
+                          alert(mensagem);
+                        }
                       } : undefined}
                     />
                   )}

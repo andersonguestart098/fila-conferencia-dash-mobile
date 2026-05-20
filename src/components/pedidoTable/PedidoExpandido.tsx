@@ -19,7 +19,7 @@ interface PedidoExpandidoProps {
   marcarTodos: (nunota: number, itens: any[], value: boolean) => void;
   setQtdConferida: (nunota: number, key: string, value: number | "") => void;
   conferenciaIniciada: boolean;
-  onFinalizarForcado?: () => void;
+  onFinalizarForcado?: () => void | Promise<void>;
 }
 
 function formatQuantidadeVisual(valor: number, aceitaDecimal: boolean): string {
@@ -331,8 +331,8 @@ export function PedidoExpandido({
           </div>
 
           <div
-            style={{ opacity: 0.45, marginTop: 10, fontSize: 12, cursor: onFinalizarForcado ? "pointer" : "default", userSelect: "none" }}
-            onClick={(e) => {
+            style={{ opacity: 0.45, marginTop: 10, fontSize: 12, userSelect: "none", cursor: "default" }}
+            onDoubleClick={(e) => {
               if (!onFinalizarForcado) return;
               e.stopPropagation();
               onFinalizarForcado();
