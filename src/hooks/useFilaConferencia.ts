@@ -19,10 +19,29 @@ interface UseFilaConferenciaResult {
     statusConferencia: string,
     nuconf?: number | null
   ) => void;
+  removerPedido: (nunota: number) => void;
 }
 
 const STATUS_REMOVER = new Set(["EXCLUIDO"]);
 const POLLING_INTERVAL_MS = 30_000; // 30s — leve e silencioso
+const LS_FORCADOS_KEY = "forcadosRemovidosFila";
+
+function carregarForcadosLS(): Set<number> {
+  try {
+    const raw = localStorage.getItem(LS_FORCADOS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr.map(Number) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function salvarForcadosLS(set: Set<number>) {
+  try {
+    localStorage.setItem(LS_FORCADOS_KEY, JSON.stringify([...set]));
+  } catch {}
+}
 
 export function useFilaConferencia(): UseFilaConferenciaResult {
   const [pedidos, setPedidos] = useState<DetalhePedido[]>([]);
@@ -30,15 +49,18 @@ export function useFilaConferencia(): UseFilaConferenciaResult {
   const [erro, setErro] = useState<string | null>(null);
   const [selecionado, setSelecionado] = useState<DetalhePedido | null>(null);
 
-  // NUNOTAs que o SSE já marcou para remover da fila.
-  // Veto: mesmo que a API retorne o pedido, ele não volta.
-  const removidosRef = useRef<Set<number>>(new Set());
+  // NUNOTAs vetados: SSE + forçados (persistido em localStorage)
+  const removidosRef = useRef<Set<number>>(carregarForcadosLS());
 
   // Controle do polling: evita chamadas simultâneas
   const pollingEmAndamentoRef = useRef(false);
 
-  const removerDaFila = useCallback((nunota: number) => {
+  const removerDaFila = useCallback((nunota: number, persistir = false) => {
     removidosRef.current.add(Number(nunota));
+
+    if (persistir) {
+      salvarForcadosLS(removidosRef.current);
+    }
 
     setPedidos((prev) =>
       prev.filter((p) => Number(p.nunota) !== Number(nunota))
@@ -171,5 +193,6 @@ export function useFilaConferencia(): UseFilaConferenciaResult {
     setSelecionado,
     refresh: carregar,
     aplicarStatusLocal,
+    removerPedido: (nunota: number) => removerDaFila(nunota, true),
   };
 }

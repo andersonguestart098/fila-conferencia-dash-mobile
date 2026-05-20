@@ -23,6 +23,28 @@ interface PedidoTableProps {
   selecionado: DetalhePedido | null;
   onSelect: (pedido: DetalhePedido) => void;
   onRefresh?: () => void;
+  onRemoverPedido?: (nunota: number) => void;
+}
+
+const LS_BUGADOS_KEY = "pedidosBugados";
+
+function lerBugados(): Set<number> {
+  try {
+    const raw = localStorage.getItem(LS_BUGADOS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr.map(Number) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function adicionarBugado(nunota: number) {
+  try {
+    const set = lerBugados();
+    set.add(Number(nunota));
+    localStorage.setItem(LS_BUGADOS_KEY, JSON.stringify([...set]));
+  } catch {}
 }
 
 export function PedidoTable({
@@ -31,8 +53,10 @@ export function PedidoTable({
   erro,
   onSelect,
   onRefresh,
+  onRemoverPedido,
 }: PedidoTableProps) {
   const [modalModo, setModalModo] = useState<"iniciar" | "finalizar">("finalizar");
+  const [bugados, setBugados] = useState<Set<number>>(() => lerBugados());
 
   const state = usePedidoTableState(pedidos);
 
@@ -460,6 +484,7 @@ if (erro && pedidos.length === 0) {
                     disabledIniciar={disabledIniciar}
                     disabledFinalizar={disabledFinalizar}
                     bloqueioChecklist={bloqueioChecklist}
+                    isBugado={bugados.has(p.nunota)}
                     onToggleExpand={() => {
                       onSelect(p);
                       setExpandedNunota((cur) => (cur === p.nunota ? null : p.nunota));
@@ -488,14 +513,12 @@ if (erro && pedidos.length === 0) {
                       onFinalizarForcado={conferenciaIniciada && confExibicao ? async () => {
                         try {
                           await confirmarConferenteEFinalizar(p, confExibicao);
-                        } catch (error: any) {
-                          const mensagem =
-                            error?.response?.data?.message ||
-                            error?.response?.data?.mensagem ||
-                            error?.response?.data?.error ||
-                            error?.message ||
-                            "Não foi possível finalizar.";
-                          alert(mensagem);
+                        } catch {
+                          // ignora erro — remoção forçada ocorre de qualquer forma
+                        } finally {
+                          adicionarBugado(p.nunota);
+                          setBugados(lerBugados());
+                          onRemoverPedido?.(p.nunota);
                         }
                       } : undefined}
                     />

@@ -16,6 +16,8 @@ interface PedidoRowProps {
   disabledFinalizar: boolean;
   bloqueioChecklist: boolean;
 
+  isBugado: boolean;
+
   onToggleExpand: () => void;
   onIniciar: () => void;
   onFinalizar: () => void;
@@ -34,6 +36,7 @@ export function PedidoRow({
   disabledIniciar,
   disabledFinalizar,
   bloqueioChecklist,
+  isBugado,
   onToggleExpand,
   onIniciar,
   onFinalizar,
@@ -56,11 +59,31 @@ export function PedidoRow({
       onClick={onToggleExpand}
     >
       <td>
-        <div style={{ fontWeight: 900 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 900 }}>
           #{pedido.nunota}
           {pedido.numNota != null && pedido.numNota !== 0 && (
-            <span style={{ marginLeft: 8, opacity: 0.8, fontWeight: 700 }}>
+            <span style={{ opacity: 0.8, fontWeight: 700 }}>
               NF {pedido.numNota}
+            </span>
+          )}
+          {isBugado && (
+            <span
+              title="Finalização forçada — pedido com problema"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                padding: "1px 6px",
+                borderRadius: 999,
+                background: "rgba(239,68,68,0.12)",
+                border: "1px solid rgba(239,68,68,0.35)",
+                color: "#b91c1c",
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: "default",
+              }}
+            >
+              🐛 BUG
             </span>
           )}
         </div>
